@@ -1,0 +1,53 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.5'
+	id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'paypass'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// 데이터베이스 관련 의존성
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	implementation 'mysql:mysql-connector-java'
+
+	implementation 'mysql:mysql-connector-java'
+	implementation 'mysql:mysql-connector-java:8.0.33'
+
+	// 웹 관련 의존성
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+	// Lombok 의존성
+	compileOnly 'org.projectlombok:lombok'
+	implementation 'org.projectlombok:lombok:1.18.26'
+	annotationProcessor 'org.projectlombok:lombok:1.18.26'
+
+	// 테스트 의존성
+	testImplementation ('org.springframework.boot:spring-boot-starter-test'){
+		exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
