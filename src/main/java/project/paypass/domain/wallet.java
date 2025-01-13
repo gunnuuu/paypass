@@ -12,7 +12,7 @@ public class wallet {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String main_id;
+    private String mainid;
 
     @Column(nullable = false)
     private Long account;
@@ -23,8 +23,8 @@ public class wallet {
     @Column(nullable = false)
     private boolean payCheck;
 
-    public wallet(String main_id) {
-        this.main_id = main_id;
+    public wallet(String mainid) {
+        this.mainid = mainid;
         this.account = 0L;
         this.charge = 0L;
         this.payCheck = true;

@@ -11,7 +11,7 @@ public class log {
     private Long id;
 
     @Column(nullable = false)
-    private String main_id;
+    private String mainid;
 
     @Column(nullable = false)
     private LocalDateTime departureTime;
@@ -28,8 +28,8 @@ public class log {
     @Column(nullable = false)
     boolean payCheck;
 
-    public log(String main_id, LocalDateTime departureTime, LocalDateTime arrivalTime, Long departureStation, Long arrivalStation) {
-        this.main_id = main_id;
+    public log(String mainid, LocalDateTime departureTime, LocalDateTime arrivalTime, Long departureStation, Long arrivalStation) {
+        this.mainid = mainid;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
         this.departureStation = departureStation;

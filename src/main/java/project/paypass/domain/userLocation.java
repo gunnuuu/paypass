@@ -10,7 +10,7 @@ public class userLocation {
     private Long id;
 
     @Column(nullable = false)
-    private String main_id;
+    private String mainid;
 
     @Column(nullable = false)
     private double longitude;
@@ -21,8 +21,8 @@ public class userLocation {
     @Column(nullable = false)
     private LocalDateTime time;
 
-    public userLocation(String main_id, double longitude, double latitude) {
-        this.main_id = main_id;
+    public userLocation(String mainid, double longitude, double latitude) {
+        this.mainid = mainid;
         this.longitude = longitude;
         this.latitude = latitude;
         this.time = LocalDateTime.now();

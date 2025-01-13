@@ -11,7 +11,7 @@ public class geofenceLocation {
     private Long id;
 
     @Column(nullable = false)
-    private String main_id;
+    private String mainid;
 
     @Column(nullable = false)
     private LocalDateTime fenceInTime;
@@ -25,8 +25,8 @@ public class geofenceLocation {
     @Column(nullable = false)
     private boolean board;
 
-    public geofenceLocation(String main_id, Long stationNumber) {
-        this.main_id = main_id;
+    public geofenceLocation(String mainid, Long stationNumber) {
+        this.mainid = mainid;
         this.fenceInTime = LocalDateTime.now();
         this.fenceOutTime = LocalDateTime.of(2000, 1, 1, 0, 0);
         this.stationNumber = stationNumber;

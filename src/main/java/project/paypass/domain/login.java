@@ -10,13 +10,13 @@ public class login {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String main_id;
+    private String mainid;
 
     @Column(nullable = false)
     private String password;
 
-    public login(String main_id, String password) {
-        this.main_id = main_id;
+    public login(String mainid, String password) {
+        this.mainid = mainid;
         this.password = password;
     }
 }
