@@ -8,4 +8,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<user, Long> {
     Optional<user> findBymainid(String mainid);  // mainid로 사용자 조회
     boolean existsBymainid(String mainid);       // mainid로 존재 여부 확인
+
+    // 이메일로 유저 찾기
+    user findByMainid(String mainid);
 }

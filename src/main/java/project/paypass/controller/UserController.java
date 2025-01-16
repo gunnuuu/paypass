@@ -3,6 +3,7 @@ package project.paypass.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import project.paypass.domain.user;
 import project.paypass.service.UserService;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,4 +44,18 @@ public class UserController {
         return ResponseEntity.ok("추가 정보가 저장되었습니다.");
     }
 
+    // 유저 정보 반환
+    @GetMapping("/info")
+    public ResponseEntity<user> getUserInfo(@RequestParam("email") String email) {
+        System.out.println("유저 정보 요청 도달: " + email);
+
+        // 유저 정보 조회 로직
+        user user = userService.getUserInfoByEmail(email);  // email을 기준으로 유저 정보 조회
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(user);  // 유저 정보 반환
+    }
 }
+

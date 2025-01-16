@@ -42,4 +42,7 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public user getUserInfoByEmail(String email) {
+        return userRepository.findByMainid(email);
+    }
 }
