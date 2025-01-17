@@ -1,48 +1,36 @@
 package project.paypass.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import project.paypass.domain.user;
+import project.paypass.domain.User;
 import project.paypass.repository.UserRepository;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    // 첫 로그인 여부를 확인하는 메서드
-    public boolean isFirstLogin(String email) {
-        System.out.println("Email 존재 여부 확인: " + userRepository.existsBymainid(email));
-        return !userRepository.existsBymainid(email); // 이메일로 사용자 조회, 없으면 첫 로그인
+    @Transactional
+    public boolean checkNewUser(String mainId){
+        return userRepository.findByMainId(mainId).isEmpty();
     }
 
-    public void saveAdditionalInfo( String email, String name, String birthdate, String phone) {
-        user user = new user();
-
-        // 이메일로 mainid설정
-        user.setMainId(email);
-        // 이름, 생년월일, 전화번호 설정
-        user.setName(name);
-
-        // 날짜 형식 처리
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        LocalDate birthDate = LocalDate.parse(birthdate.trim(), formatter);
-        user.setBirth(birthDate);
-
-        user.setPhoneNumber(phone);
-
-        // 저장할 때 mainid가 제대로 설정되어 있는지 확인
-        System.out.println("저장할 사용자 정보: " + user);
-
-        // 사용자를 저장 (기존 데이터가 있으면 업데이트)
+    @Transactional
+    public void save(User user){
         userRepository.save(user);
     }
 
-    public user getUserInfoByEmail(String email) {
-        return userRepository.findByMainid(email);
+    @Transactional
+    public User findById(Long id){
+        return userRepository.findById(id).get();
+    }
+
+    @Transactional
+    public Long findIdByMainId(String mainId){
+        return userRepository.findByMainId(mainId).get(0).getId();
     }
 }

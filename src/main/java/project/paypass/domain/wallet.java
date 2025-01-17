@@ -4,15 +4,19 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor
 @Entity
-public class wallet {
+@Getter
+public class Wallet {
 
     @Id @GeneratedValue
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String mainid;
+    private String mainId;
 
     @Column(nullable = false)
     private Long account;
@@ -23,8 +27,8 @@ public class wallet {
     @Column(nullable = false)
     private boolean payCheck;
 
-    public wallet(String mainid) {
-        this.mainid = mainid;
+    public Wallet(String mainId) {
+        this.mainId = mainId;
         this.account = 0L;
         this.charge = 0L;
         this.payCheck = true;

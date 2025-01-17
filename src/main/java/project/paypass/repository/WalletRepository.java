@@ -3,12 +3,13 @@ package project.paypass.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import project.paypass.domain.User;
+import project.paypass.domain.Wallet;
 
 import java.util.List;
 
 @Repository
-public interface UserRepository extends JpaRepository<User,Long> {
+public interface WalletRepository extends JpaRepository<Wallet, Long> {
 
-    List<User> findByMainId(@Param("mainId")String mainId);
+    List<Wallet> findByMainId(@Param("mainId")String mainId);
+
 }

@@ -1,7 +1,7 @@
 package project.paypass.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import project.paypass.domain.station;
+import project.paypass.domain.Station;
 
-public interface stationRepository extends JpaRepository<station, Long> {
+public interface StationRepository extends JpaRepository<Station, Long> {
 }

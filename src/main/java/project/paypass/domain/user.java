@@ -1,45 +1,35 @@
 package project.paypass.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
+@NoArgsConstructor
 @Entity
-@Data
-public class user {
+@Getter
+public class User {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String mainid;
+    private String mainId;
 
     @Column(nullable = false)
     private String name;
 
     @Column(nullable = false)
-    private LocalDate birth;
+    private LocalDateTime birth;
 
     @Column(nullable = false)
     private String phoneNumber;
 
-    public user(String mainid, String name, LocalDate birth, String phoneNumber) {
-        this.mainid = mainid;
+    public User(String mainId, String name, LocalDateTime birth, String phoneNumber) {
+        this.mainId = mainId;
         this.name = name;
         this.birth = birth;
         this.phoneNumber = phoneNumber;
-    }
-
-    public user() {
-
-    }
-
-    public void setMainId(String email) {
-        this.mainid = email;
-    }
-
-    public String getMainId() {
-        return mainid;
     }
 }
