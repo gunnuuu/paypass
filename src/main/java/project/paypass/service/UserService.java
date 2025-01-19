@@ -33,4 +33,9 @@ public class UserService {
     public Long findIdByMainId(String mainId){
         return userRepository.findByMainId(mainId).get(0).getId();
     }
+
+    @Transactional
+    public User findByMainId(String mainId){
+        return userRepository.findByMainId(mainId).get(0);
+    }
 }

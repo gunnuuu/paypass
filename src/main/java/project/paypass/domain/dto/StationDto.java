@@ -8,11 +8,13 @@ import lombok.ToString;
 @ToString
 @NoArgsConstructor
 public class StationDto {
+    private String name;
     private Long stationNumber;
-    private Double latitude;
-    private Double longitude;
+    private double latitude;
+    private double longitude;
 
-    public StationDto(Long stationNumber, Double latitude, Double longitude) {
+    public StationDto(String name, Long stationNumber, double latitude, double longitude) {
+        this.name = name;
         this.stationNumber = stationNumber;
         this.latitude = latitude;
         this.longitude = longitude;

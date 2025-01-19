@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class LoginHttpService {
+
     private final UserService userService;
     private final WalletService walletService;
 
