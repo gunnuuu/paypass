@@ -33,4 +33,13 @@ public class Wallet {
         this.charge = 0L;
         this.payCheck = true;
     }
+
+    // 새로운 생성자 추가: account만 변경할 수 있도록
+    public Wallet(Long id, String mainId, Long account, Long charge, boolean payCheck) {
+        this.id = id;
+        this.mainId = mainId;
+        this.account = account;
+        this.charge = charge;
+        this.payCheck = payCheck;
+    }
 }
