@@ -1,12 +1,16 @@
 package project.paypass.domain;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
 @NoArgsConstructor
 @Entity
+@ToString
+@Data
 public class GeofenceLocation {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,20 +22,23 @@ public class GeofenceLocation {
     @Column(nullable = false)
     private LocalDateTime fenceInTime;
 
-    @Column(nullable = false)
     private LocalDateTime fenceOutTime;
 
     @Column(nullable = false)
     private Long stationNumber;
 
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String busInfo;
+
     @Column(nullable = false)
     private boolean board;
 
-    public GeofenceLocation(String main_id, Long stationNumber) {
+    public GeofenceLocation(String mainId, Long stationNumber, String busInfo) {
         this.mainId = mainId;
         this.fenceInTime = LocalDateTime.now();
-        this.fenceOutTime = LocalDateTime.of(2000, 1, 1, 0, 0);
+        this.fenceOutTime = null;
         this.stationNumber = stationNumber;
+        this.busInfo = busInfo;
         this.board = false;
     }
 
@@ -39,7 +46,12 @@ public class GeofenceLocation {
         this.fenceOutTime = LocalDateTime.now();
     }
 
-    public void userBoardBus(){
-        this.board = true;
+    public boolean fenceOutTimeIsNull(){
+        return fenceOutTime == null;
     }
+
+    public LocalDateTime userFenceInTime(){
+        return this.fenceInTime;
+    }
+
 }
