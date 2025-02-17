@@ -29,7 +29,7 @@ public class LoginController {
         Map<String, String> response = new HashMap<>();
 
         if (checkNewUser) {
-            response.put("status", "NEW_USER");
+            response.put("status", "NEW_USER"); 
         }
 
         if (!checkNewUser) {
