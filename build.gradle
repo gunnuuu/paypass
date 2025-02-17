@@ -39,10 +39,14 @@ dependencies {
 
 	// Jakarta Servlet 의존성 추가
 	implementation 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
 	// Lombok 의존성
 	compileOnly 'org.projectlombok:lombok'
 	implementation 'org.projectlombok:lombok:1.18.26'
 	annotationProcessor 'org.projectlombok:lombok:1.18.26'
+
+	//외부 라이브러리
+	implementation 'org.apache.commons:commons-lang3:3.12.0'
 
 	// 테스트 의존성
 	testImplementation ('org.springframework.boot:spring-boot-starter-test'){
