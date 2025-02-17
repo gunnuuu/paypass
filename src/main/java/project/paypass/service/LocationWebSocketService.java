@@ -1,5 +1,6 @@
 package project.paypass.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import project.paypass.domain.UserLocation;
@@ -11,6 +12,7 @@ public class LocationWebSocketService {
 
     private final UserLocationService userLocationService;
 
+    @Transactional
     public void saveUserLocation(UserLocationDto userLocationDto){
         String mainId = userLocationDto.getMainId();
         double longitude = userLocationDto.getLongitude();
