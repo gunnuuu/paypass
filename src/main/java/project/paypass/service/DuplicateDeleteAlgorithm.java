@@ -1,13 +1,9 @@
 package project.paypass.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.antlr.v4.runtime.tree.Tree;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 import project.paypass.domain.GeofenceLocation;
 
-import java.lang.reflect.Array;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,17 +22,36 @@ public class DuplicateDeleteAlgorithm {
         Map<String, List<Long>> stationMap = makeStationMap(sortedGeofenceLocations, averageTimeMap);
         log.info("stationMap = " + stationMap);
 
+        // routeId : List<> geofenceLocation 형식의 Map 작성
+        // route별 geofenceLocation Map 생성
+        Map<String, List<GeofenceLocation>> geofenceLocationMap = makeGeofenceLocationMap(sortedGeofenceLocations);
+        log.info("geofenceLocationMap = " + geofenceLocationMap);
+
         // routeId: Map<> fenceInTime, fenceOutTime 형식의 Map 작성
-        Map<String, List<Map<String, LocalDateTime>>> timeMap = makeTimeMap(sortedGeofenceLocations, stationMap);
+        Map<String, List<Map<String, LocalDateTime>>> timeMap = makeTimeMap(geofenceLocationMap, stationMap);
+        log.info("timeMap = " + timeMap);
+
+        // ** 현재 stationMap과 continuousGeofenceLocationMap과 timeMap은 같은 유형이다. (value의 유형만 다르다)
+        // stationMap 정류장 포함 제거 알고리즘 작동 (시간체크필요)
+        // stationNumberList가 같지는 않지만 포함하고 시간도 포함하는 관게면 삭제
+        deleteContainStation(stationMap, timeMap);
+        log.info("################################# deleteContainStation method가 작동한 이후 #################################");
+        log.info("stationMap = " + stationMap);
         log.info("timeMap = " + timeMap);
 
         // stationMap 정류장 중복 제거 알고리즘 작동 (시간체크필요)
-
-
-        // stationMap 정류장 포함 제거 알고리즘 작동 (시간체크필요)
-
+        // stationNumberList와 시간이 같다는 조건은 버스 후보 조건이다.
+        deleteEqualStation(stationMap,timeMap);
 
         return null;
+    }
+
+    private void deleteEqualStation(Map<String, List<Long>> stationMap, Map<String, List<Map<String, LocalDateTime>>> timeMap) {
+        // stationList가 완전히 동일한 경우에만 작동
+        // 1. 시간마저 동일 -> 통합 (후보군으로 취급)
+        // 2. 시간 다름 -> 다른 상황으로 취급
+        // 3. 시간 걸침? ->
+        // 얘도 null check 해야된다.
     }
 
     private Map<String, List<Long>> makeStationMap(List<GeofenceLocation> geofenceLocations, Map<String, List<Long>> averageTimeMap) {
@@ -68,15 +83,28 @@ public class DuplicateDeleteAlgorithm {
         return stationMap;
     }
 
-    private Map<String, List<Map<String, LocalDateTime>>> makeTimeMap(List<GeofenceLocation> geofenceLocations, Map<String, List<Long>> stationMap) {
-        // route별 geofenceLocation Map 생성
-        Map<String, List<GeofenceLocation>> geofenceLocationMap = makeGeofenceLocationMap(geofenceLocations);
-        log.info("geofenceLocationMap = " + geofenceLocationMap);
+    private Map<String, List<GeofenceLocation>> makeGeofenceLocationMap(List<GeofenceLocation> geofenceLocations) {
+        Map<String, List<GeofenceLocation>> geofenceLocationMap = new TreeMap<>();
 
+        List<String> busInfoList = makeBusInfoList(geofenceLocations);
+
+        // busInfoList에서 routeId만을 추출해서 set 생성
+        Set<String> routeIdSet = makeRouteIdSet(busInfoList);
+
+        // geofenceLocationMap에서 key값 추가
+        geofenceLocationMapPlusKey(geofenceLocationMap, routeIdSet);
+
+        // geofenceLocationMap에서 value값 추가
+        geofenceLocationMapPlusValue(geofenceLocationMap, geofenceLocations);
+
+        return geofenceLocationMap;
+    }
+
+    private Map<String, List<Map<String, LocalDateTime>>> makeTimeMap(Map<String, List<GeofenceLocation>> geofenceLocationMap, Map<String, List<Long>> stationMap) {
         // 인자가 하나인 경우 삭제 +
         // stationMap과 똑같은 모양의 routeId = List<GeofenceLocation> 형식의 Map 생성
         Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap = makeContinuousGeofenceLocationMap(geofenceLocationMap, stationMap);
-        System.out.println("continuousGeofenceLocationMap 생성 및 routedId&stationNumber 중복된 stationMap 삭제");
+        log.info("################################# continuousGeofenceLocationMap 생성 및 routedId&stationNumber 중복된 stationMap 삭제 #################################");
         log.info("stationMap = " + stationMap);
         log.info("continuousGeofenceLocationMap = " + continuousGeofenceLocationMap);
 
@@ -84,6 +112,61 @@ public class DuplicateDeleteAlgorithm {
         Map<String, List<Map<String, LocalDateTime>>> timeMap = transformGeofenceLocationToTime(continuousGeofenceLocationMap);
 
         return timeMap;
+    }
+
+    private Map<String, List<GeofenceLocation>> makeContinuousGeofenceLocationMap(Map<String, List<GeofenceLocation>> geofenceLocationMap, Map<String, List<Long>> stationMap) {
+        Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap = new TreeMap<>();
+        List<String> deleteKeyList = new ArrayList<>();
+
+        for (var routeIdAndGeofenceLocationList : geofenceLocationMap.entrySet()) {
+            String routeId = routeIdAndGeofenceLocationList.getKey();
+            List<GeofenceLocation> geofenceLocationList = routeIdAndGeofenceLocationList.getValue();
+            // 값 추가할때 startIndex 맞추기 위해 존재
+            int deleteStartIndex = 0;
+
+            String pattern = ".*" + routeId + ".*";
+
+            if (geofenceLocationList.size() < 2) continue;
+
+            List<Long> stationNumberList = makeStationNumberList(geofenceLocationList);
+
+            for (var routeIdAndStationNumberList : stationMap.entrySet()) {
+                String routeIdInStationMap = routeIdAndStationNumberList.getKey();
+                List<Long> stationNumberListInStationMap = routeIdAndStationNumberList.getValue();
+
+                if (routeIdInStationMap.matches(pattern)) {
+                    // 있다면 continuousGeofenceLocationMap에 추가 + stationNumberList에서 값 삭제
+                    if (Collections.indexOfSubList(stationNumberList, stationNumberListInStationMap) != -1) {
+                        int startIndex = Collections.indexOfSubList(stationNumberList, stationNumberListInStationMap);
+                        // continuousGeofenceLocationMap에 값 추가
+                        continuousGeofenceLocationMap.put(routeIdInStationMap, geofenceLocationList.subList(startIndex + deleteStartIndex, startIndex + deleteStartIndex + stationNumberListInStationMap.size()));
+                        // 중복 방지를 위해 List에서 확인된 값 삭제
+                        stationNumberList.subList(startIndex, startIndex + stationNumberListInStationMap.size()).clear();
+                        // stationMap에 존재하는 stationNumberList의 size만큼 추가 (geofenceLocationList에 적용하기 위함)
+                        deleteStartIndex += stationNumberListInStationMap.size();
+                        continue;
+                    }
+
+                    // stationNumberList에는 없는데 stationMap에는 있는 경우
+                    // -> stationMap 삭제 (routeId와 stationNumber + 시간이 겹치는 경우)
+                    if (Collections.indexOfSubList(stationNumberList, stationNumberListInStationMap) == -1) {
+                        deleteKeyList.add(routeIdInStationMap);
+                    }
+                } // match if문 종료
+            } // for문 종료
+        }
+        // 중복된 부분 stationMap에서 삭제
+        for (String routeId : deleteKeyList) {
+            stationMap.remove(routeId);
+        }
+
+        return continuousGeofenceLocationMap;
+    }
+
+    private List<Long> makeStationNumberList(List<GeofenceLocation> geofenceLocationList) {
+        return geofenceLocationList.stream()
+                .map(GeofenceLocation::getStationNumber)
+                .collect(Collectors.toList());
     }
 
     private Map<String, List<Map<String, LocalDateTime>>> transformGeofenceLocationToTime(Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap) {
@@ -108,77 +191,80 @@ public class DuplicateDeleteAlgorithm {
         return timeMap;
     }
 
-    private Map<String, List<GeofenceLocation>> makeGeofenceLocationMap(List<GeofenceLocation> geofenceLocations) {
-        Map<String, List<GeofenceLocation>> geofenceLocationMap = new TreeMap<>();
+    private void deleteContainStation(Map<String, List<Long>> stationMap, Map<String, List<Map<String, LocalDateTime>>> timeMap) {
+        // 삭제할 key 값을 담을 리스트
+        ArrayList<String> deleteKeyList = new ArrayList<>();
 
-        List<String> busInfoList = makeBusInfoList(geofenceLocations);
+        for (var routeIdAndStationNumber : stationMap.entrySet()) {
+            String routeId = routeIdAndStationNumber.getKey();
+            List<Long> stationNumberList = routeIdAndStationNumber.getValue();
 
-        // busInfoList에서 routeId만을 추출해서 set 생성
-        Set<String> routeIdSet = makeRouteIdSet(busInfoList);
-
-        // geofenceLocationMap에서 key값 추가
-        geofenceLocationMapPlusKey(geofenceLocationMap, routeIdSet);
-
-        // geofenceLocationMap에서 value값 추가
-        geofenceLocationMapPlusValue(geofenceLocationMap, geofenceLocations);
-
-        return geofenceLocationMap;
-    }
-
-    private Map<String, List<GeofenceLocation>> makeContinuousGeofenceLocationMap(Map<String, List<GeofenceLocation>> geofenceLocationMap, Map<String, List<Long>> stationMap) {
-        Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap = new TreeMap<>();
-        List<String> deleteKeyList = new ArrayList<>();
-
-        for (var routeIdAndGeofenceLocationList : geofenceLocationMap.entrySet()) {
-            String routeId = routeIdAndGeofenceLocationList.getKey();
-            List<GeofenceLocation> geofenceLocationList = routeIdAndGeofenceLocationList.getValue();
-
-            int deleteStartIndex = 0;
-
-            String pattern = ".*" + routeId + ".*";
-
-            if (geofenceLocationList.size() < 2) {
-                continue;
+            for (var routeIdAndStationNumberInner : stationMap.entrySet()) {
+                String routeIdInner = routeIdAndStationNumberInner.getKey();
+                List<Long> stationNumberListInner = routeIdAndStationNumberInner.getValue();
+                // 포함은 하지만 동일하지 않는 경우
+                if (Collections.indexOfSubList(stationNumberList, stationNumberListInner) != -1
+                        && !stationNumberList.equals(stationNumberListInner)) {
+                    // 시간도 포함하는지 확인
+                    String deleteKey = checkTime(routeId, routeIdInner, timeMap);
+                    deleteKeyList.add(deleteKey);
+                } // end if
             }
-
-            List<Long> stationNumberList = geofenceLocationList.stream()
-                    .map(GeofenceLocation::getStationNumber)
-                    .collect(Collectors.toList());
-
-            for (var routeIdAndStationNumberList : stationMap.entrySet()) {
-                String routeIdInStationMap = routeIdAndStationNumberList.getKey();
-                List<Long> stationNumberListInStationMap = routeIdAndStationNumberList.getValue();
-
-                if (routeIdInStationMap.matches(pattern)) {
-                    // 있다면 continuousGeofenceLocationMap에 추가 + stationNumberList에서 값 삭제
-                    if (Collections.indexOfSubList(stationNumberList,stationNumberListInStationMap) != -1) {
-
-                        int startIndex = Collections.indexOfSubList(stationNumberList, stationNumberListInStationMap);
-
-                        continuousGeofenceLocationMap.put(routeIdInStationMap,geofenceLocationList.subList(startIndex + deleteStartIndex, startIndex + deleteStartIndex + stationNumberListInStationMap.size()));
-
-                        stationNumberList.subList(startIndex, startIndex + stationNumberListInStationMap.size()).clear();
-
-                        deleteStartIndex += stationNumberListInStationMap.size();
-
-                        continue;
-                    }
-
-                    // stationNumberList에는 없는데 stationMap에는 있는 경우
-                    // -> stationMap 삭제 (routeId와 stationNumber가 겹치는 경우이다.)
-                    if (Collections.indexOfSubList(stationNumberList, stationNumberListInStationMap) == -1) {
-                        deleteKeyList.add(routeIdInStationMap);
-                    }
-                } // match if문 종료
-            } // for문 종료
-        }
+        } // end for
 
         for (String routeId : deleteKeyList) {
+            if (routeId.equals("-1")) continue;
+            if (routeId == null) throw new RuntimeException("checkTime 메서드에서 오류 발생");
             stationMap.remove(routeId);
+            timeMap.remove(routeId);
+        }
+    }
+
+    private String checkTime(String routeId, String routeIdInner, Map<String, List<Map<String, LocalDateTime>>> timeMap) {
+        System.out.println("checkTime method 실행 routeId = " + routeId + "routeIdInner = " + routeIdInner);
+
+        // 해당 routeId의 시간을 비교해서 시간마저 포함한다면 삭제 대상
+        // 비교는 가장 처음 값의 fenceInTime과 가장 마지막 값의 fenceOutTime으로 비교한다.
+        int listSizeOuter = timeMap.get(routeId).size();
+        LocalDateTime fenceInTimeOuter = timeMap.get(routeId).get(0).get("fenceInTime");
+        LocalDateTime fenceOutTimeOuter = timeMap.get(routeId).get(listSizeOuter - 1).get("fenceOutTime");
+
+        int listSizeInner = timeMap.get(routeIdInner).size();
+        LocalDateTime fenceInTimeInner = timeMap.get(routeIdInner).get(0).get("fenceInTime");
+        LocalDateTime fenceOutTimeInner = timeMap.get(routeIdInner).get(listSizeInner - 1).get("fenceOutTime");
+        // fenceOutTime이 null인 경우는?
+        // 1. Outer가 null Inner도 null -> 포함했다고 판단
+        // 3. Outer는 null Inner는 인자값 -> fenceInTime 비교 필요
+        // 2. Outer가 인자값 Inner은 null -> Inner가 더 최근인 경우 -> 스킵
+        // 4. 둘 다 인자값 -> 포함 여부 확인 필요
+
+        // 1.
+        if (fenceOutTimeOuter == null && fenceOutTimeInner == null) {
+            return routeIdInner;
         }
 
-        return continuousGeofenceLocationMap;
+        // 2
+        if (fenceOutTimeOuter == null && fenceOutTimeInner != null) {
+            return (fenceInTimeOuter.compareTo(fenceInTimeInner) > 0) ? "-1" : routeIdInner;
+        }
+
+        // 3
+        if (fenceOutTimeOuter != null && fenceOutTimeInner == null) {
+            return "-1";
+        }
+
+        // 4
+        if (fenceOutTimeOuter != null && fenceOutTimeInner != null) {
+            if (fenceInTimeOuter.compareTo(fenceInTimeInner) < 0 && fenceOutTimeOuter.compareTo(fenceOutTimeInner) > 0) {
+                return routeIdInner;
+            }
+        }
+
+        return null;
     }
+
+    // deleteEqualStation 자리
+
 
     private List<String> makeBusInfoList(List<GeofenceLocation> sortedGeofenceLocations) {
         // busInfo만 존재하는 List 생성
