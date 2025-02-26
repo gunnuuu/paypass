@@ -6,8 +6,11 @@ import project.paypass.domain.BusTime;
 import project.paypass.domain.GeofenceLocation;
 import project.paypass.repository.BusTimeRepository;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -20,35 +23,63 @@ public class AverageTimeAlgorithmService {
         this.busTimeRepository = busTimeRepository;
     }
 
-    public List<GeofenceLocation> algorithmStart(Map<String, List<Long>> busInfoMap, List<GeofenceLocation> geofenceLocations) {
+    public Map<String, List<Long>> algorithmStart(Map<String, List<Long>> busInfoMap, List<GeofenceLocation> geofenceLocations) {
         log.info("시간알고리즘 시작한 후 받아온 busInfoMap: {}", busInfoMap);
 
         // 연속된 sequence 구간만 추출
         Map<String, List<Long>> consecutiveSequences = extractConsecutiveSequences(busInfoMap);
         log.info("추출된 연속된 sequence들을 가진 쌍들: {}", consecutiveSequences);
 
+        // 변형된 routeId를 원래 routeId로 변환한 매핑 저장
+        Map<String, String> originalRouteIdMap = new HashMap<>();
+        Map<String, List<Long>> processedSequences = new HashMap<>();
+
+        for (String modifiedRouteId : consecutiveSequences.keySet()) {
+            String originalRouteId = modifiedRouteId.replaceAll("_\\d+$", ""); // _1, _2 제거
+            originalRouteIdMap.put(modifiedRouteId, originalRouteId);
+            processedSequences.put(originalRouteId, consecutiveSequences.get(modifiedRouteId));
+        }
+
+        log.info("변형된 routeId -> 원래 routeId 매핑: {}", originalRouteIdMap);
+        log.info("원래 routeId 기준으로 정리된 sequence 리스트: {}", processedSequences);
+
         // 연속된 sequence 구간에 대해 판별 처리
-        List<GeofenceLocation> boardedLocations = new ArrayList<>();
+        Map<String, List<Long>> boardedLocationsMap = new HashMap<>();
 
-        for (String routeId : consecutiveSequences.keySet()) {
-            List<Long> sequences = consecutiveSequences.get(routeId);
-            log.info("판별할 사용 예상 경로의 routeId: {}, sequences: {}", routeId, sequences);
+        for (String originalRouteId : processedSequences.keySet()) {
+            List<Long> sequences = processedSequences.get(originalRouteId);
+            log.info("판별할 사용 예상 경로의 원래 routeId: {}, sequences: {}", originalRouteId, sequences);
 
-            // routeId별 평균 이동 시간 맵 가져오기 (BusTime 테이블에서 조회)
-            Map<Integer, Long> sequenceTimeMap = fetchExpectedTimes(routeId);
-            log.info("routeId별 버스 걸리는시간 데이터로 부터 가져온 예상 시간 {}: {}", routeId, sequenceTimeMap);
+            // 원래 routeId 기준으로 BusTime 테이블 조회
+            Map<Integer, Long> sequenceTimeMap = fetchExpectedTimes(originalRouteId);
+            log.info("routeId별 버스 걸리는시간 데이터로 부터 가져온 예상 시간 {}: {}", originalRouteId, sequenceTimeMap);
 
             // 연속된 sequence 구간에서 이동 시간 비교
             List<GeofenceLocation> checkedStops = checkPossibleBoarding(geofenceLocations, sequenceTimeMap, sequences);
 
             if (!checkedStops.isEmpty()) {
-                log.info("최종 판별된 탑승한 구간의 routeId {}: {}", routeId, checkedStops);
-                boardedLocations.addAll(checkedStops); // 탑승한 위치들 추가
+                List<Long> checkedSequences = new ArrayList<>();
+                for (GeofenceLocation stop : checkedStops) {
+                    String busInfo = stop.getBusInfo();
+                    for (Long seq : sequences) {
+                        if (busInfo.contains(String.valueOf(seq))) {
+                            checkedSequences.add(seq);
+                        }
+                    }
+                }
+                log.info("최종 판별된 탑승한 구간의 원래 routeId {}: {}", originalRouteId, checkedSequences);
+
+                // 원래 routeId를 변형된 형태(_1, _2 포함)로 복원해서 저장
+                for (String modifiedRouteId : originalRouteIdMap.keySet()) {
+                    if (originalRouteIdMap.get(modifiedRouteId).equals(originalRouteId)) {
+                        boardedLocationsMap.put(modifiedRouteId, new ArrayList<>(checkedSequences));
+                    }
+                }
             }
         }
 
-        log.info("최종 리스트: {}", boardedLocations);
-        return boardedLocations; // 버스를 탑승한 위치들만 포함된 리스트 리턴
+        log.info("최종 리스트 (원래 routeId 복원된 상태): {}", boardedLocationsMap);
+        return boardedLocationsMap; // 변형된 routeId 포함하여 리턴
     }
 
     // 연속된 sequence 구간을 추출하는 메서드
@@ -95,16 +126,34 @@ public class AverageTimeAlgorithmService {
         List<BusTime> busTimes = busTimeRepository.findByRouteId(routeId);
         Map<Integer, Long> sequenceTimeMap = new HashMap<>();
 
-        for (BusTime time : busTimes) {
-            // 도착일시와 출발일시를 LocalTime으로 변환
-            LocalTime arrival = LocalTime.parse(time.getArrivalTime().substring(8, 12)); // 시간:분으로 변환
-            LocalTime departure = LocalTime.parse(time.getDepartureTime().substring(8, 12)); // 시간:분으로 변환
 
-            // 이동 시간 계산 (분 단위)
-            long expectedTime = Duration.between(departure, arrival).toMinutes();
+        // BusTime 리스트에서 각각의 버스 시간 정보 처리
+        for (int i = 0; i < busTimes.size() - 1; i++) {
+            BusTime currentBus = busTimes.get(i);
+            BusTime nextBus = busTimes.get(i + 1);
 
-            sequenceTimeMap.put(time.getSequence(), expectedTime);
-            log.info("routeId {}, sequence {}, 예상시간: {} 분", routeId, time.getSequence(), expectedTime);
+            try {
+                // BOM 제거
+                String currentDepartureTimeStr = String.valueOf(currentBus.getDepartureTime()).replace("\uFEFF", "");
+                String nextArrivalTimeStr = String.valueOf(nextBus.getArrivalTime()).replace("\uFEFF", "");
+
+                // DateTimeFormatter로 파싱
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+                // 문자열을 LocalDateTime으로 변환
+                LocalDateTime currentDeparture = LocalDateTime.parse(currentDepartureTimeStr, formatter);
+                LocalDateTime nextArrival = LocalDateTime.parse(nextArrivalTimeStr, formatter);
+
+                // 이동 시간 계산 (분 단위)
+                long expectedTime = Duration.between(currentDeparture, nextArrival).toMinutes();
+
+                sequenceTimeMap.put(currentBus.getSequence(), expectedTime);
+                log.info("routeId {}, sequence {} -> sequence {}, 예상시간: {} 분",
+                        currentBus.getRouteId(), currentBus.getSequence(), nextBus.getSequence(), expectedTime);
+            } catch (Exception e) {
+                log.error("시간 변환 오류! routeId {}, sequence {}, departureTime {}, arrivalTime {}",
+                        currentBus.getRouteId(), currentBus.getSequence(), currentBus.getDepartureTime(), nextBus.getArrivalTime(), e);
+            }
         }
         return sequenceTimeMap;
     }
