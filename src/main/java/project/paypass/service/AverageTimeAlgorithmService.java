@@ -6,10 +6,8 @@ import project.paypass.domain.BusTime;
 import project.paypass.domain.GeofenceLocation;
 import project.paypass.repository.BusTimeRepository;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -62,7 +60,7 @@ public class AverageTimeAlgorithmService {
                 for (GeofenceLocation stop : checkedStops) {
                     String busInfo = stop.getBusInfo();
                     for (Long seq : sequences) {
-                        if (busInfo.contains(String.valueOf(seq))) {
+                        if (busInfo.contains(String.valueOf(seq)) && !checkedSequences.contains(seq)) {
                             checkedSequences.add(seq);
                         }
                     }
@@ -78,8 +76,8 @@ public class AverageTimeAlgorithmService {
             }
         }
 
-        log.info("최종 리스트 (원래 routeId 복원된 상태): {}", boardedLocationsMap);
-        return boardedLocationsMap; // 변형된 routeId 포함하여 리턴
+        log.info("최종 리스트 (원래 routeId 복원된 상태) boardedLocationsMap : {}", boardedLocationsMap);
+        return boardedLocationsMap; // 변형된 routeId 포함하여 리턴 <- 중복제거에 넘겨줄 맵
     }
 
     // 연속된 sequence 구간을 추출하는 메서드
@@ -185,12 +183,13 @@ public class AverageTimeAlgorithmService {
                     startSeq, endSeq, actualTime, expectedTime);
 
             // 오차범위(2분 이하 <- 변경가능) 내에 있으면 버스를 탔다고 판별
-            if (expectedTime != null && Math.abs(actualTime - expectedTime) <= 2) {
+            if (expectedTime != null && Math.abs(actualTime - expectedTime) <= 20) {
                 log.info("찾은 탑승 결과 {} -> {}", startSeq, endSeq);
                 checkedStops.add(startStop);
                 checkedStops.add(endStop);  // 끝나는 지점도 추가
             }
         }
+        log.info("checkedStops: {}", checkedStops);
 
         return checkedStops;
     }
