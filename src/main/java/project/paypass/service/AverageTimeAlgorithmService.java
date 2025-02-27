@@ -24,18 +24,14 @@ public class AverageTimeAlgorithmService {
     public Map<String, List<Long>> algorithmStart(Map<String, List<Long>> busInfoMap, List<GeofenceLocation> geofenceLocations) {
         log.info("시간알고리즘 시작한 후 받아온 busInfoMap: {}", busInfoMap);
 
-        // 연속된 sequence 구간만 추출
-        Map<String, List<Long>> consecutiveSequences = extractConsecutiveSequences(busInfoMap);
-        log.info("추출된 연속된 sequence들을 가진 쌍들: {}", consecutiveSequences);
-
         // 변형된 routeId를 원래 routeId로 변환한 매핑 저장
         Map<String, String> originalRouteIdMap = new HashMap<>();
         Map<String, List<Long>> processedSequences = new HashMap<>();
 
-        for (String modifiedRouteId : consecutiveSequences.keySet()) {
+        for (String modifiedRouteId : busInfoMap.keySet()) {
             String originalRouteId = modifiedRouteId.replaceAll("_\\d+$", ""); // _1, _2 제거
             originalRouteIdMap.put(modifiedRouteId, originalRouteId);
-            processedSequences.put(originalRouteId, consecutiveSequences.get(modifiedRouteId));
+            processedSequences.put(originalRouteId, busInfoMap.get(modifiedRouteId));
         }
 
         log.info("변형된 routeId -> 원래 routeId 매핑: {}", originalRouteIdMap);
@@ -78,45 +74,6 @@ public class AverageTimeAlgorithmService {
 
         log.info("최종 리스트 (원래 routeId 복원된 상태) boardedLocationsMap : {}", boardedLocationsMap);
         return boardedLocationsMap; // 변형된 routeId 포함하여 리턴 <- 중복제거에 넘겨줄 맵
-    }
-
-    // 연속된 sequence 구간을 추출하는 메서드
-    private Map<String, List<Long>> extractConsecutiveSequences(Map<String, List<Long>> busInfoMap) {
-        log.info("busInfoMap으로 부터 연속된 구간 추출중...");
-
-        Map<String, List<Long>> consecutiveSequences = new HashMap<>(); // 연속된 부분들 저장한 맵
-
-        for (Map.Entry<String, List<Long>> entry : busInfoMap.entrySet()) {
-            String routeId = entry.getKey();
-            List<Long> sequences = entry.getValue();
-
-            List<Long> consecutive = new ArrayList<>();
-            Long prevSequence = null;
-
-            for (Long sequence : sequences) {
-                // 연속된 sequence일 경우
-                if (prevSequence == null || sequence == prevSequence + 1) {
-                    consecutive.add(sequence);
-                } else {
-                    // 연속이 끊어진 경우 (새로운 연속 구간 시작)
-                    if (!consecutive.isEmpty()) {
-                        consecutiveSequences.put(routeId, new ArrayList<>(consecutive));
-                        log.info("연속된 sequence을 만족하는 구간별 routeId {}: {}", routeId, consecutive);
-                    }
-                    consecutive.clear();
-                    consecutive.add(sequence);
-                }
-                prevSequence = sequence;
-            }
-
-            // 마지막 구간 추가 (연속이 끊어지지 않은 경우)
-            if (!consecutive.isEmpty()) {
-                consecutiveSequences.put(routeId, consecutive);
-                log.info("연속된 sequence을 만족하는 구간별 routeId {}: {}", routeId, consecutive);
-            }
-        }
-
-        return consecutiveSequences;
     }
 
     private Map<Integer, Long> fetchExpectedTimes(String routeId) {
