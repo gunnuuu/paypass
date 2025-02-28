@@ -1,6 +1,5 @@
 package project.paypass.controller;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -10,9 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 import project.paypass.domain.GeofenceLocation;
 import project.paypass.domain.dto.UserGeofenceDto;
 import project.paypass.service.GeofenceService;
+import project.paypass.service.LogService;
 import project.paypass.service.StationService;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -21,9 +22,9 @@ public class GeofenceController {
 
     private final StationService stationService;
     private final GeofenceService geofenceService;
+    private final LogService logService;
 
     @PostMapping("/userFenceIn")
-    @Transactional
     public ResponseEntity<Void> userGeofenceIn(@RequestBody UserGeofenceDto userGeofenceDto){
         log.info("사용자가 geofence에 접근했기 때문에 userGeofenceIn method를 실행합니다.");
 
@@ -40,14 +41,23 @@ public class GeofenceController {
         log.info("geofenceLocation 데이터를 생성 후 저장했습니다.");
         log.info("geofenceLocation: {}", geofenceLocation);
 
-        // 메인 알고리즘 실행
-        geofenceService.startAlgorithm(mainId);
-
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/algorithmStart")
+    public void algorithmStart(@RequestBody Map<String, String> payload){ // 일단 dto를 사용하지 않고 Map으로 해결
 
-    @PostMapping("userFenceOut")
+        String mainId = payload.get("mainId");
+        log.info("메인 알고리즘을 실행합니다.");
+
+        Map<List<GeofenceLocation>, List<String>> resultMap = geofenceService.startAlgorithm(mainId);
+
+        // 이후 데이터 저장
+        logService.saveLogData(mainId, resultMap);
+    }
+
+
+    @PostMapping("/userFenceOut")
     public ResponseEntity<Void> userGeofenceOut(@RequestBody UserGeofenceDto userGeofenceDto){
         log.info("사용자가 geofence에서 이탈했기 때문에 userGeofenceOut method를 실행합니다.");
 
