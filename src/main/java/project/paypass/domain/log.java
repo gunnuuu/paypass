@@ -28,14 +28,27 @@ public class Log {
     private Long arrivalStationNumber;
 
     @Column(nullable = false)
+    private String routeIdList;
+
+    @Column(nullable = false)
     PayCheck payCheck;
 
-    public Log(String mainId, LocalDateTime departureTime, LocalDateTime arrivalTime, Long departureStationNumber, Long arrivalStationNumber) {
+    public Log(String mainId, LocalDateTime departureTime, LocalDateTime arrivalTime, Long departureStationNumber, Long arrivalStationNumber, String routeIdList) {
         this.mainId = mainId;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
         this.departureStationNumber = departureStationNumber;
         this.arrivalStationNumber = arrivalStationNumber;
+        this.routeIdList = routeIdList;
         this.payCheck = PayCheck.False;
+    }
+
+    @Override
+    public String toString() {
+        return "Log{" +
+                "id=" + id +
+                ", mainId='" + mainId + '\'' +
+                ", routeIdList='" + routeIdList + '\'' +
+                '}';
     }
 }
