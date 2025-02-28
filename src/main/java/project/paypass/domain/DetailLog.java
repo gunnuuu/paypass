@@ -15,16 +15,32 @@ public class DetailLog {
     @Column(nullable = false)
     private String mainId;
 
-    @Column(nullable = false)
-    private Long logId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "log_id", nullable = false)
+    private Log log;
 
     @Column(nullable = false)
     private LocalDateTime fenceInTime;
 
-    @Column(nullable = false)
     private LocalDateTime fenceOutTime;
 
     @Column(nullable = false)
     private Long stationNumber;
 
+    public DetailLog(String mainId, Log log, LocalDateTime fenceInTime, LocalDateTime fenceOutTime, Long stationNumber) {
+        this.mainId = mainId;
+        this.log = log;
+        this.fenceInTime = fenceInTime;
+        this.fenceOutTime = fenceOutTime;
+        this.stationNumber = stationNumber;
+    }
+
+    @Override
+    public String toString() {
+        return "DetailLog{" +
+                "mainId='" + mainId + '\'' +
+                ", log=" + log +
+                ", stationNumber=" + stationNumber +
+                '}';
+    }
 }
