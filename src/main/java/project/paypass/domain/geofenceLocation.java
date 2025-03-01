@@ -1,7 +1,6 @@
 package project.paypass.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
@@ -10,7 +9,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Entity
 @ToString
-@Data
 public class GeofenceLocation {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -54,4 +52,17 @@ public class GeofenceLocation {
     public String stationBusInfo(){
         return this.busInfo;
     }
+
+    public Long getStationNumber(){
+        return this.stationNumber;
+    }
+
+    public LocalDateTime getFenceOutTime() {
+        return this.fenceOutTime;
+    }
+
+    public LocalDateTime getFenceInTime() {
+        return this.fenceInTime;
+    }
+
 }
