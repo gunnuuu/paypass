@@ -56,7 +56,7 @@ public class AverageTimeAlgorithmService {
             if (!checkedStops.isEmpty()) {
                 List<Long> checkedSequences = new ArrayList<>();
                 for (GeofenceLocation stop : checkedStops) {
-                    String busInfo = stop.getBusInfo();
+                    String busInfo = stop.stationBusInfo();
                     for (Long seq : sequences) {
                         if (busInfo.contains(String.valueOf(seq)) && !checkedSequences.contains(seq)) {
                             checkedSequences.add(seq);
@@ -215,11 +215,11 @@ public class AverageTimeAlgorithmService {
 
                 // geofenceLocations에서 startSeq과 endSeq에 해당하는 GeofenceLocation 찾아서 추가
                 GeofenceLocation startStop = geofenceLocations.stream()
-                        .filter(g -> g.getBusInfo().contains(String.valueOf(startSeq)))
+                        .filter(g -> g.stationBusInfo().contains(String.valueOf(startSeq)))
                         .findFirst().orElse(null);
 
                 GeofenceLocation endStop = geofenceLocations.stream()
-                        .filter(g -> g.getBusInfo().contains(String.valueOf(endSeq)))
+                        .filter(g -> g.stationBusInfo().contains(String.valueOf(endSeq)))
                         .findFirst().orElse(null);
 
                 if (startStop != null) checkedStops.add(startStop);
