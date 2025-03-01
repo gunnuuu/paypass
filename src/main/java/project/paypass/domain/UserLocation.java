@@ -9,27 +9,27 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Entity
 @Getter
-public class User {
+public class UserLocation {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String mainId;
 
     @Column(nullable = false)
-    private String name;
+    private double longitude;
 
     @Column(nullable = false)
-    private LocalDateTime birth;
+    private double latitude;
 
     @Column(nullable = false)
-    private String phoneNumber;
+    private LocalDateTime time;
 
-    public User(String mainId, String name, LocalDateTime birth, String phoneNumber) {
+    public UserLocation(String mainId, double longitude, double latitude) {
         this.mainId = mainId;
-        this.name = name;
-        this.birth = birth;
-        this.phoneNumber = phoneNumber;
+        this.longitude = longitude;
+        this.latitude = latitude;
+        this.time = LocalDateTime.now();
     }
 }
