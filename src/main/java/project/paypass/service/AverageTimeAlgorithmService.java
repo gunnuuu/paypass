@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -50,29 +51,14 @@ public class AverageTimeAlgorithmService {
             Map<Integer, Long> sequenceTimeMap = fetchExpectedTimes(originalRouteId, sequences);
             log.info("routeId별 버스 걸리는시간 데이터로 부터 가져온 예상 시간 {}: {}", originalRouteId, sequenceTimeMap);
 
-            // 연속된 sequence 구간에서 이동 시간 비교
-            List<GeofenceLocation> checkedStops = checkPossibleBoarding(originalRouteId, geofenceLocations, sequenceTimeMap, timeMap, sequences);
-
-            if (!checkedStops.isEmpty()) {
-                List<Long> checkedSequences = new ArrayList<>();
-                for (GeofenceLocation stop : checkedStops) {
-                    String busInfo = stop.stationBusInfo();
-                    for (Long seq : sequences) {
-                        if (busInfo.contains(String.valueOf(seq)) && !checkedSequences.contains(seq)) {
-                            checkedSequences.add(seq);
-                        }
-                    }
-                }
-                log.info("최종 판별된 탑승한 구간의 원래 routeId {}: {}", originalRouteId, checkedSequences);
-
-                // 🛠 변형된 modifiedRouteId 그대로 저장
-                boardedLocationsMap.put(modifiedRouteId, new ArrayList<>(checkedSequences));
-            }
+            // 최종 버스탑승이 판별된 routeId와 sequences 저장한 맵
+            boardedLocationsMap = checkPossibleBoarding(originalRouteId, geofenceLocations, sequenceTimeMap, timeMap, sequences);
         }
 
-        log.info("최종 리스트 (변형된 routeId 유지) boardedLocationsMap : {}", boardedLocationsMap);
+        log.info("최종 리스트 (같은 routeId 경우 _숫자 추가) boardedLocationsMap : {}", boardedLocationsMap);
         return boardedLocationsMap;
     }
+
 
     private Map<String, List<GeofenceLocation>> makeGeofenceLocationMap(List<GeofenceLocation> geofenceLocations) {
         Map<String, List<GeofenceLocation>> geofenceLocationMap = new TreeMap<>();
@@ -92,12 +78,16 @@ public class AverageTimeAlgorithmService {
     }
 
     private Map<String, List<Map<String, LocalDateTime>>> makeTimeMap(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
+        // 해당 Map에서 연속적인 sequence를 만족하는 데이터들만 남긴 consequenceMap 생성
+        Map<String, List<GeofenceLocation>> consequenceMap = remainGeofenceLocationToConsequence(geofenceLocationMap);
 
-        // 해당 Map에서 userFenceInTime과 userFenceOutTime을 활용한 Map 생성
-        Map<String, List<Map<String, LocalDateTime>>> timeMap = transformGeofenceLocationToTime(geofenceLocationMap);
+
+        // 해당 Map에서 userFenceInTime과 userFenceOutTime을 활용한 timeMap 생성
+        Map<String, List<Map<String, LocalDateTime>>> timeMap = transformGeofenceLocationToTime(consequenceMap);
 
         return timeMap;
     }
+
 
     private Map<Integer, Long> fetchExpectedTimes(String routeId, List<Long> sequences) {
         log.info("routeId별 예상시간 찾기: {}", routeId);
@@ -166,70 +156,195 @@ public class AverageTimeAlgorithmService {
         return sequenceTimeMap;
     }
 
-    private List<GeofenceLocation> checkPossibleBoarding(String routeId, List<GeofenceLocation> geofenceLocations,
-                                                         Map<Integer, Long> sequenceTimeMap, Map<String, List<Map<String, LocalDateTime>>> timeMap,
-                                                         List<Long> sequences) {
+    private Map<String, List<Long>> checkPossibleBoarding(String routeId, List<GeofenceLocation> geofenceLocations,
+                                                          Map<Integer, Long> sequenceTimeMap, Map<String, List<Map<String, LocalDateTime>>> timeMap,
+                                                          List<Long> sequences) {
         log.info("탑승 가능성 있는 sequences: {}", sequences);
-        List<GeofenceLocation> checkedStops = new ArrayList<>();
+        Map<String, List<Long>> boardedLocationsMap = new HashMap<>();
 
         // routeId에 해당하는 fenceInTime, fenceOutTime 정보 가져오기
         List<Map<String, LocalDateTime>> timeList = timeMap.get(routeId);
 
         if (timeList == null || timeList.size() < sequences.size()) {
             log.warn("routeId {}에 대한 timeList 데이터가 부족함", routeId);
-            return checkedStops;
+            return boardedLocationsMap;
         }
 
-        for (int i = 0; i < sequences.size() - 1; i++) {
-            long startSeq = sequences.get(i);
-            long endSeq = sequences.get(i + 1);
-            log.info("탑승 가능성 있는 sequence의 pair: {} -> {}", startSeq, endSeq);
+        // 연속된 sequence들을 그룹화
+        List<List<Long>> groupedSequences = groupConsecutiveSequences(sequences);
 
-            // timeList에서 startSeq과 endSeq에 해당하는 fenceOutTime과 fenceInTime 가져오기
-            Map<String, LocalDateTime> startTimeMap = timeList.get(i);
-            Map<String, LocalDateTime> endTimeMap = timeList.get(i + 1);
+        int groupCounter = 1;  // 그룹 번호를 매기기 위한 카운터
+        for (List<Long> group : groupedSequences) {
+            String currentKey = routeId + "_" + groupCounter;  // _숫자 붙여서 구간 구별
+            log.info("현재 그룹: {}", group);
 
-            if (startTimeMap == null || endTimeMap == null) {
-                log.warn("sequence {} 또는 {}에 대한 시간 데이터가 없음", startSeq, endSeq);
-                continue;
+            // 구간 처리
+            for (int i = 0; i < group.size() - 1; i++) {
+                long startSeq = group.get(i);
+                long endSeq = group.get(i + 1);
+                log.info("탑승 가능성 있는 sequence의 pair: {} -> {}", startSeq, endSeq);
+
+                // timeList에서 startSeq과 endSeq에 해당하는 fenceOutTime과 fenceInTime 가져오기
+                Map<String, LocalDateTime> startTimeMap = timeList.get(i);
+                Map<String, LocalDateTime> endTimeMap = timeList.get(i + 1);
+
+                if (startTimeMap == null || endTimeMap == null) {
+                    log.warn("sequence {} 또는 {}에 대한 시간 데이터가 없음", startSeq, endSeq);
+                    continue;
+                }
+
+                LocalDateTime fenceOutTime = startTimeMap.get("fenceOutTime");
+                LocalDateTime fenceInTime = endTimeMap.get("fenceInTime");
+
+                if (fenceOutTime == null || fenceInTime == null) {
+                    log.warn("sequence {} -> {}: fenceOutTime 또는 fenceInTime 값이 없음", startSeq, endSeq);
+                    continue;
+                }
+
+                // 실제 이동 시간 계산
+                long actualTime = Duration.between(fenceOutTime, fenceInTime).toMinutes();
+                Long expectedTime = sequenceTimeMap.get((int) startSeq);
+
+                log.info("실제 걸린 이동시간 sequence pair {} -> {}: {} 분, 데이터에 따른 예상시간은 : {} 분",
+                        startSeq, endSeq, actualTime, expectedTime);
+
+                // 오차 범위(기본 20분) 내에 있으면 버스를 탔다고 판별
+                if (expectedTime != null && Math.abs(actualTime - expectedTime) <= 20) {
+                    log.info("탑승 확인: sequence {} -> {}", startSeq, endSeq);
+
+                    // 구간 번호와 연속된 sequence 값을 put
+                    boardedLocationsMap.put(currentKey, new ArrayList<>(group));
+                }
             }
-
-            LocalDateTime fenceOutTime = startTimeMap.get("fenceOutTime");
-            LocalDateTime fenceInTime = endTimeMap.get("fenceInTime");
-
-            if (fenceOutTime == null || fenceInTime == null) {
-                log.warn("sequence {} -> {}: fenceOutTime 또는 fenceInTime 값이 없음", startSeq, endSeq);
-                continue;
-            }
-
-            // 실제 이동 시간 계산
-            long actualTime = Duration.between(fenceOutTime, fenceInTime).toMinutes();
-            Long expectedTime = sequenceTimeMap.get((int) startSeq);
-
-            log.info("실제 걸린 이동시간 sequence pair {} -> {}: {} 분, 데이터에 따른 예상시간은 : {} 분",
-                    startSeq, endSeq, actualTime, expectedTime);
-
-            // 오차 범위(기본 2분 → 20분으로 변경) 내에 있으면 버스를 탔다고 판별
-            if (expectedTime != null && Math.abs(actualTime - expectedTime) <= 20) {
-                log.info("탑승 확인: sequence {} -> {}", startSeq, endSeq);
-
-                // geofenceLocations에서 startSeq과 endSeq에 해당하는 GeofenceLocation 찾아서 추가
-                GeofenceLocation startStop = geofenceLocations.stream()
-                        .filter(g -> g.stationBusInfo().contains(String.valueOf(startSeq)))
-                        .findFirst().orElse(null);
-
-                GeofenceLocation endStop = geofenceLocations.stream()
-                        .filter(g -> g.stationBusInfo().contains(String.valueOf(endSeq)))
-                        .findFirst().orElse(null);
-
-                if (startStop != null) checkedStops.add(startStop);
-                if (endStop != null) checkedStops.add(endStop);
-            }
+            groupCounter++;
         }
 
-        log.info("최종 체크된 탑승 정류장: {}", checkedStops);
-        return checkedStops;
+        log.info("최종 체크된 탑승 정류장: {}", boardedLocationsMap);
+
+        return boardedLocationsMap;
     }
+
+    // 연속된 sequence를 그룹화하는 메서드
+    private List<List<Long>> groupConsecutiveSequences(List<Long> sequences) {
+        List<List<Long>> groupedSequences = new ArrayList<>();
+        List<Long> currentGroup = new ArrayList<>();
+
+        for (int i = 0; i < sequences.size(); i++) {
+            if (currentGroup.isEmpty()) {
+                currentGroup.add(sequences.get(i));
+            } else {
+                // 연속되는 sequence만 그룹에 추가
+                long prev = currentGroup.get(currentGroup.size() - 1);
+                if (sequences.get(i) == prev + 1) {
+                    currentGroup.add(sequences.get(i));
+                } else {
+                    groupedSequences.add(new ArrayList<>(currentGroup));
+                    currentGroup.clear();
+                    currentGroup.add(sequences.get(i));
+                }
+            }
+        }
+        // 마지막 그룹을 추가
+        if (!currentGroup.isEmpty()) {
+            groupedSequences.add(currentGroup);
+        }
+
+        return groupedSequences;
+    }
+
+
+    private List<GeofenceLocation> findMatchingStops(List<GeofenceLocation> geofenceLocations, LocalDateTime fenceOutTime, LocalDateTime fenceInTime) {
+        return geofenceLocations.stream()
+                .filter(g -> isMatchingStop(g, fenceOutTime, fenceInTime))
+                .collect(Collectors.toList());
+    }
+
+
+    private boolean isMatchingStop(GeofenceLocation location, LocalDateTime fenceOutTime, LocalDateTime fenceInTime) {
+        // GeofenceLocation의 inTime과 outTime이 fenceInTime, fenceOutTime과 일치하는지 확인
+        return (location.getFenceInTime().equals(fenceInTime) && location.getFenceOutTime().equals(fenceOutTime));
+    }
+
+
+    //연속적인 seqeunce쌍들만 남기기
+    private Map<String, List<GeofenceLocation>> remainGeofenceLocationToConsequence(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
+        Map<String, List<GeofenceLocation>> consequenceMap = new HashMap<>();
+
+        for (String routeId : geofenceLocationMap.keySet()) {
+            List<GeofenceLocation> locations = geofenceLocationMap.get(routeId);
+
+            // 연속된 sequence만 남기기
+            List<GeofenceLocation> filteredLocations = filterConsecutiveSequences(locations, routeId);
+
+            consequenceMap.put(routeId, filteredLocations);
+        }
+
+        log.info("consequenceMap 생성 완료: {}", consequenceMap);
+        return consequenceMap;
+    }
+
+
+    private List<GeofenceLocation> filterConsecutiveSequences(List<GeofenceLocation> locations, String routeId) {
+        List<GeofenceLocation> result = new ArrayList<>();
+        List<GeofenceLocation> temp = new ArrayList<>();
+
+        // busInfoMap처럼 String 형태로 sequence 값 추출
+        List<Long> sequences = extractSequencesFromBusInfo(locations, routeId);
+
+        // sequence가 하나만 있거나 아예 없을 때를 대비한 예외 처리
+        if (sequences.isEmpty()) {
+            log.warn("sequences 리스트가 비어있습니다.");
+            return result;
+        }
+
+        for (int i = 0; i < sequences.size(); i++) {
+            // 처음에는 temp에 첫 번째 시퀀스를 넣는다
+            if (temp.isEmpty()) {
+                temp.add(locations.get(i));
+            } else {
+                // 현재 sequence가 이전 sequence와 1씩 증가하는지 확인
+                if (sequences.get(i) == sequences.get(i - 1) + 1) {
+                    temp.add(locations.get(i)); // 연속된 sequence일 경우 temp에 추가
+                } else {
+                    if (temp.size() > 1) { // 2개 이상이면 연속된 시퀀스로 저장
+                        result.addAll(temp);
+                    }
+                    temp.clear(); // 새로운 구간 시작
+                    temp.add(locations.get(i)); // 새로운 구간의 첫 번째 시퀀스를 추가
+                }
+            }
+        }
+
+        // 마지막 요소 추가 처리 (마지막 인덱스에 대한 처리)
+        if (!temp.isEmpty() && temp.size() > 1) {
+            result.addAll(temp);
+        }
+
+        return result;
+    }
+
+
+    private List<Long> extractSequencesFromBusInfo(List<GeofenceLocation> locations, String routeId) {
+        List<Long> sequences = new ArrayList<>();
+
+        for (GeofenceLocation location : locations) {
+            String busInfo = location.stationBusInfo(); // busInfo 가져오기
+
+            // busInfo에서 해당 routeId에 맞는 sequence 찾기
+            for (String entry : busInfo.split("},\\{")) {
+                entry = entry.replaceAll("[{}]", "");  // `{100100014,1}` -> `100100014,1`
+                String[] parts = entry.split(",");    // `100100014,1` -> `["100100014", "1"]`
+                if (parts.length == 2 && parts[0].equals(routeId)) {
+                    sequences.add(Long.parseLong(parts[1])); // sequence 값 저장
+                    break;
+                }
+            }
+        }
+
+        return sequences;
+    }
+
+
 
 
     private Map<String, List<Map<String, LocalDateTime>>> transformGeofenceLocationToTime(Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap) {
