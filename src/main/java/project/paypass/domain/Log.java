@@ -1,12 +1,14 @@
 package project.paypass.domain;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @NoArgsConstructor
 @Entity
+@Data
 public class Log {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,13 +18,7 @@ public class Log {
     private String mainId;
 
     @Column(nullable = false)
-    private LocalDateTime departureTime;
-
-    @Column(nullable = false)
     private LocalDateTime arrivalTime;
-
-    @Column(nullable = false)
-    private Long departureStationNumber;
 
     @Column(nullable = false)
     private Long arrivalStationNumber;
@@ -33,11 +29,9 @@ public class Log {
     @Column(nullable = false)
     PayCheck payCheck;
 
-    public Log(String mainId, LocalDateTime departureTime, LocalDateTime arrivalTime, Long departureStationNumber, Long arrivalStationNumber, String routeIdList) {
+    public Log(String mainId, LocalDateTime arrivalTime, Long arrivalStationNumber, String routeIdList) {
         this.mainId = mainId;
-        this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
-        this.departureStationNumber = departureStationNumber;
         this.arrivalStationNumber = arrivalStationNumber;
         this.routeIdList = routeIdList;
         this.payCheck = PayCheck.False;
