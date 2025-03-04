@@ -57,4 +57,11 @@ public class GeofenceLocation {
         return this.busInfo;
     }
 
+    @Override
+    public String toString() {
+        return "GeofenceLocation{" +
+                "mainId='" + mainId + '\'' +
+                ", stationNumber=" + stationNumber +
+                '}';
+    }
 }
