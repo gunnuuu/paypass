@@ -29,7 +29,7 @@ public class AverageTimeAlgorithmService {
         List<GeofenceLocation> sortedGeofenceLocations = sortByUserFenceInTime(geofenceLocations);
 
         // 최종 결과 저장할 맵 (변형된 routeId 유지)
-        Map<String, List<Long>> boardedLocationsMap = new HashMap<>();
+        Map<String, List<Long>> boardedLocationsMap = new TreeMap<>();
 
         // routeId : List<> geofenceLocation 형식의 Map 작성
         // route별 geofenceLocation Map 생성
@@ -52,7 +52,22 @@ public class AverageTimeAlgorithmService {
             log.info("routeId별 버스 걸리는시간 데이터로 부터 가져온 예상 시간 {}: {}", originalRouteId, sequenceTimeMap);
 
             // 최종 버스탑승이 판별된 routeId와 sequences 저장한 맵
-            boardedLocationsMap = checkPossibleBoarding(originalRouteId, geofenceLocations, sequenceTimeMap, timeMap, sequences);
+            Map<String, List<Long>> result = checkPossibleBoarding(originalRouteId, geofenceLocations, sequenceTimeMap, timeMap, sequences);
+
+            // `boardedLocationsMap`에 각 결과를 추가할 때 덮어쓰지 않도록 처리
+            for (Map.Entry<String, List<Long>> entry : result.entrySet()) {
+                String key = entry.getKey();
+                List<Long> existingSequences = boardedLocationsMap.get(key);
+
+                // 동일한 키가 이미 있다면, 해당 그룹 번호를 증가시켜서 새로운 키 생성
+                if (existingSequences != null) {
+                    int groupNumber = Integer.parseInt(key.split("_")[1]) + 1;
+                    String newKey = key.split("_")[0] + "_" + groupNumber;
+                    boardedLocationsMap.put(newKey, entry.getValue());
+                } else {
+                    boardedLocationsMap.put(key, entry.getValue());
+                }
+            }
         }
 
         log.info("최종 리스트 (같은 routeId 경우 _숫자 추가) boardedLocationsMap : {}", boardedLocationsMap);
@@ -93,7 +108,7 @@ public class AverageTimeAlgorithmService {
         log.info("routeId별 예상시간 찾기: {}", routeId);
 
         List<BusTime> busTimes = busTimeRepository.findByRouteId(routeId);
-        Map<Integer, Long> sequenceTimeMap = new HashMap<>();
+        Map<Integer, Long> sequenceTimeMap = new TreeMap<>();
 
         log.info("fetchExpectedTimes()에서 originalRouteId 조회: {}", routeId);
 
@@ -160,7 +175,7 @@ public class AverageTimeAlgorithmService {
                                                           Map<Integer, Long> sequenceTimeMap, Map<String, List<Map<String, LocalDateTime>>> timeMap,
                                                           List<Long> sequences) {
         log.info("탑승 가능성 있는 sequences: {}", sequences);
-        Map<String, List<Long>> boardedLocationsMap = new HashMap<>();
+        Map<String, List<Long>> boardedLocationsMap = new TreeMap<>();
 
         // routeId에 해당하는 fenceInTime, fenceOutTime 정보 가져오기
         List<Map<String, LocalDateTime>> timeList = timeMap.get(routeId);
@@ -268,7 +283,7 @@ public class AverageTimeAlgorithmService {
 
     //연속적인 seqeunce쌍들만 남기기
     private Map<String, List<GeofenceLocation>> remainGeofenceLocationToConsequence(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
-        Map<String, List<GeofenceLocation>> consequenceMap = new HashMap<>();
+        Map<String, List<GeofenceLocation>> consequenceMap = new TreeMap<>();
 
         for (String routeId : geofenceLocationMap.keySet()) {
             List<GeofenceLocation> locations = geofenceLocationMap.get(routeId);
