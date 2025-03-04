@@ -56,13 +56,26 @@ public class AverageTimeAlgorithmService {
 
             // `boardedLocationsMap`에 각 결과를 추가할 때 덮어쓰지 않도록 처리
             for (Map.Entry<String, List<Long>> entry : result.entrySet()) {
-                String key = entry.getKey();
+                String key = entry.getKey();  // 현재 routeId_숫자 형식의 key
                 List<Long> existingSequences = boardedLocationsMap.get(key);
 
-                // 동일한 키가 이미 있다면, 해당 그룹 번호를 증가시켜서 새로운 키 생성
                 if (existingSequences != null) {
-                    int groupNumber = Integer.parseInt(key.split("_")[1]) + 1;
-                    String newKey = key.split("_")[0] + "_" + groupNumber;
+                    // 현재 존재하는 key 목록에서 가장 큰 group 번호 찾기
+                    int maxGroupNumber = 0;
+                    for (String existingKey : boardedLocationsMap.keySet()) {
+                        if (existingKey.startsWith(key.split("_")[0] + "_")) {
+                            String[] parts = existingKey.split("_");
+                            if (parts.length == 2) {
+                                try {
+                                    maxGroupNumber = Math.max(maxGroupNumber, Integer.parseInt(parts[1]));
+                                } catch (NumberFormatException ignored) {
+                                }
+                            }
+                        }
+                    }
+
+                    // 다음 group 번호 할당
+                    String newKey = key.split("_")[0] + "_" + (maxGroupNumber + 1);
                     boardedLocationsMap.put(newKey, entry.getValue());
                 } else {
                     boardedLocationsMap.put(key, entry.getValue());
@@ -266,20 +279,6 @@ public class AverageTimeAlgorithmService {
 
         return groupedSequences;
     }
-
-
-    private List<GeofenceLocation> findMatchingStops(List<GeofenceLocation> geofenceLocations, LocalDateTime fenceOutTime, LocalDateTime fenceInTime) {
-        return geofenceLocations.stream()
-                .filter(g -> isMatchingStop(g, fenceOutTime, fenceInTime))
-                .collect(Collectors.toList());
-    }
-
-
-    private boolean isMatchingStop(GeofenceLocation location, LocalDateTime fenceOutTime, LocalDateTime fenceInTime) {
-        // GeofenceLocation의 inTime과 outTime이 fenceInTime, fenceOutTime과 일치하는지 확인
-        return (location.getFenceInTime().equals(fenceInTime) && location.getFenceOutTime().equals(fenceOutTime));
-    }
-
 
     //연속적인 seqeunce쌍들만 남기기
     private Map<String, List<GeofenceLocation>> remainGeofenceLocationToConsequence(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
