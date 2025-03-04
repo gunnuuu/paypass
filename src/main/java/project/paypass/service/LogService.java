@@ -6,12 +6,14 @@ import org.springframework.stereotype.Service;
 import project.paypass.domain.DetailLog;
 import project.paypass.domain.GeofenceLocation;
 import project.paypass.domain.Log;
+import project.paypass.domain.dto.LogDto;
 import project.paypass.repository.DetailLogRepository;
 import project.paypass.repository.LogRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -68,4 +70,19 @@ public class LogService {
         }
     }
 
+    public List<LogDto> getLogsByMainId(String mainId) {
+        List<Log> logs = logRepository.findByMainId(mainId);
+
+        return logs.stream()
+                .map(log -> new LogDto(
+                        log.getMainId(),
+                        log.getDepartureTime(),
+                        log.getArrivalTime(),
+                        log.getDepartureStationNumber(),
+                        log.getArrivalStationNumber(),
+                        log.getRouteIdList(),
+                        log.getPayCheck()
+                ))
+                .collect(Collectors.toList());
+    }
 }
