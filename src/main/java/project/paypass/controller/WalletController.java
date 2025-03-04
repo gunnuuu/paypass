@@ -12,7 +12,7 @@ public class WalletController {
 
     private final WalletHttpService walletHttpService;
 
-    @GetMapping("/mypage/account")
+    @PostMapping("/mypage/account")
     public ResponseEntity<Long> getAccount(@RequestParam String mainId) {
         Long accountBalance = walletHttpService.getAccount(mainId);
         return ResponseEntity.ok(accountBalance);
