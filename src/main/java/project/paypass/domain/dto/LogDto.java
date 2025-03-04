@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LogDto {
+    private Long id;
     private String mainId;
     private LocalDateTime departureTime;
     private LocalDateTime arrivalTime;
