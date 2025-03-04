@@ -290,7 +290,7 @@ public class DuplicateDeleteAlgorithm {
                 return routeIdInner;
             }
             // 시간을 포함하지 않는다면 스킵
-            if (fenceInTimeOuter.compareTo(fenceOutTimeInner) > 0 || fenceOutTimeOuter.compareTo(fenceInTimeInner) < 0){
+            if (fenceInTimeOuter.compareTo(fenceOutTimeInner) >= 0 || fenceOutTimeOuter.compareTo(fenceInTimeInner) <= 0) {
                 return "-1";
             }
         }
