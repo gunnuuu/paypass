@@ -35,23 +35,18 @@ public class LogService {
     }
 
     private Log saveLog(String mainId, List<GeofenceLocation> geofenceLocationList, List<String> routeIdList) {
+        // 출발 정류장 정보
+        GeofenceLocation departure = geofenceLocationList.get(0);
+        LocalDateTime departureTime = departure.getFenceOutTime();
+        Long departureStationNumber = departure.getStationNumber();
         // 도착 정류장 정보
         GeofenceLocation arrival = geofenceLocationList.get(geofenceLocationList.size() - 1);
         LocalDateTime arrivalTime = arrival.getFenceInTime();
         Long arrivalStationNumber = arrival.getStationNumber();
-
-        log.info("추출된 arrivalStationNumber: " + arrivalStationNumber);
-
-
-        // arrivalStationNumber가 null일 경우 기본값 설정
-        if (arrivalStationNumber == null) {
-            arrivalStationNumber = 0L; // 기본값 설정 (예: 0)
-        }
-
         // routeIdList String으로 변환
         String routeIdString = String.join(",", routeIdList);
 
-        Log logData = new Log(mainId, arrivalTime, arrivalStationNumber, routeIdString);
+        Log logData = new Log(mainId, departureTime, arrivalTime, departureStationNumber, arrivalStationNumber, routeIdString);
 
         logRepository.save(logData);
         log.info("log data 저장했습니다." + logData);
