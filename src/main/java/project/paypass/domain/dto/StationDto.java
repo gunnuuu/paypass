@@ -19,4 +19,10 @@ public class StationDto {
         this.latitude = latitude;
         this.longitude = longitude;
     }
+
+    public StationDto(double latitude, double longitude, Long stationNumber) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.stationNumber = stationNumber;
+    }
 }
