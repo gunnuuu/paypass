@@ -1,5 +1,6 @@
 package project.paypass.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import project.paypass.domain.BusTime;
@@ -13,23 +14,20 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class AverageTimeAlgorithmService {
 
     private final BusTimeRepository busTimeRepository;
 
-    public AverageTimeAlgorithmService(BusTimeRepository busTimeRepository) {
-        this.busTimeRepository = busTimeRepository;
-    }
-
     public Map<String, List<Long>> algorithmStart(Map<String, List<Long>> busInfoMap, List<GeofenceLocation> geofenceLocations) {
+        // 최종 결과 저장할 맵 (변형된 routeId 유지)
+        Map<String, List<Long>> boardedLocationsMap = new TreeMap<>();
+
         log.info("시간알고리즘 시작한 후 받아온 busInfoMap: {}", busInfoMap);
 
         // 데이터 정렬(fenceInTime 기준)
         List<GeofenceLocation> sortedGeofenceLocations = sortByUserFenceInTime(geofenceLocations);
-
-        // 최종 결과 저장할 맵 (변형된 routeId 유지)
-        Map<String, List<Long>> boardedLocationsMap = new TreeMap<>();
 
         // routeId : List<> geofenceLocation 형식의 Map 작성
         // route별 geofenceLocation Map 생성
@@ -37,7 +35,7 @@ public class AverageTimeAlgorithmService {
         log.info("geofenceLocationMap = " + geofenceLocationMap);
 
         // routeId: Map<> fenceInTime, fenceOutTime 형식의 Map 작성
-        Map<String, List<Map<String, LocalDateTime>>> timeMap = makeTimeMap(geofenceLocationMap);
+        Map<String, List<Map<String, LocalDateTime>>> timeMap = makeTimeMap(geofenceLocationMap, busInfoMap);
         log.info("timeMap = " + timeMap);
 
         for (String modifiedRouteId : busInfoMap.keySet()) {
@@ -105,9 +103,9 @@ public class AverageTimeAlgorithmService {
         return geofenceLocationMap;
     }
 
-    private Map<String, List<Map<String, LocalDateTime>>> makeTimeMap(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
+    private Map<String, List<Map<String, LocalDateTime>>> makeTimeMap(Map<String, List<GeofenceLocation>> geofenceLocationMap, Map<String, List<Long>> busInfoMap) {
         // 해당 Map에서 연속적인 sequence를 만족하는 데이터들만 남긴 consequenceMap 생성
-        Map<String, List<GeofenceLocation>> consequenceMap = remainGeofenceLocationToConsequence(geofenceLocationMap);
+        Map<String, List<GeofenceLocation>> consequenceMap = remainGeofenceLocationToConsequence(geofenceLocationMap, busInfoMap);
 
 
         // 해당 Map에서 userFenceInTime과 userFenceOutTime을 활용한 timeMap 생성
@@ -156,8 +154,8 @@ public class AverageTimeAlgorithmService {
             }
 
             try {
-                String currentArrivalTimeStr = String.valueOf(currentBus.getArrivalTime()).replace("\uFEFF", "");
-                String nextArrivalTimeStr = String.valueOf(nextBus.getArrivalTime()).replace("\uFEFF", "");
+                String currentArrivalTimeStr = String.valueOf(currentBus.getArrivalTime()).replace("\uFEFF", "").trim();
+                String nextArrivalTimeStr = String.valueOf(nextBus.getArrivalTime()).replace("\uFEFF", "").trim();
 
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
                 LocalDateTime currentDeparture = LocalDateTime.parse(currentArrivalTimeStr, formatter);
@@ -206,6 +204,15 @@ public class AverageTimeAlgorithmService {
             String currentKey = routeId + "_" + groupCounter;  // _숫자 붙여서 구간 구별
             log.info("현재 그룹: {}", group);
 
+            // sequences 중에서 groupSequences의 인덱스 구하기
+            int index = Collections.indexOfSubList(sequences, group);
+            System.out.println("sequences = " + sequences);
+            System.out.println("groupedSequences = " + groupedSequences);
+            System.out.println("group = " + group);
+
+            System.out.println("index = " + index);
+
+
             // 구간 처리
             for (int i = 0; i < group.size() - 1; i++) {
                 long startSeq = group.get(i);
@@ -213,8 +220,8 @@ public class AverageTimeAlgorithmService {
                 log.info("탑승 가능성 있는 sequence의 pair: {} -> {}", startSeq, endSeq);
 
                 // timeList에서 startSeq과 endSeq에 해당하는 fenceOutTime과 fenceInTime 가져오기
-                Map<String, LocalDateTime> startTimeMap = timeList.get(i);
-                Map<String, LocalDateTime> endTimeMap = timeList.get(i + 1);
+                Map<String, LocalDateTime> startTimeMap = timeList.get(index+ i);
+                Map<String, LocalDateTime> endTimeMap = timeList.get(index + i + 1);
 
                 if (startTimeMap == null || endTimeMap == null) {
                     log.warn("sequence {} 또는 {}에 대한 시간 데이터가 없음", startSeq, endSeq);
@@ -252,6 +259,7 @@ public class AverageTimeAlgorithmService {
         return boardedLocationsMap;
     }
 
+
     // 연속된 sequence를 그룹화하는 메서드
     private List<List<Long>> groupConsecutiveSequences(List<Long> sequences) {
         List<List<Long>> groupedSequences = new ArrayList<>();
@@ -281,14 +289,23 @@ public class AverageTimeAlgorithmService {
     }
 
     //연속적인 seqeunce쌍들만 남기기
-    private Map<String, List<GeofenceLocation>> remainGeofenceLocationToConsequence(Map<String, List<GeofenceLocation>> geofenceLocationMap) {
+    private Map<String, List<GeofenceLocation>> remainGeofenceLocationToConsequence(Map<String, List<GeofenceLocation>> geofenceLocationMap, Map<String, List<Long>> busInfoMap) {
         Map<String, List<GeofenceLocation>> consequenceMap = new TreeMap<>();
 
+        Set<String> originRouteIdSet = busInfoMap.keySet().stream()
+                .map(this::toOriginRouteId)
+                .collect(Collectors.toSet());
+
         for (String routeId : geofenceLocationMap.keySet()) {
-            List<GeofenceLocation> locations = geofenceLocationMap.get(routeId);
+            List<GeofenceLocation> geofenceLocationList = geofenceLocationMap.get(routeId);
+
+            // 인자가 하나이거나 연속된 수가 존재하지 않으면 스킵
+            if (geofenceLocationList.size() < 2 || !originRouteIdSet.contains(routeId)) {
+                continue;
+            }
 
             // 연속된 sequence만 남기기
-            List<GeofenceLocation> filteredLocations = filterConsecutiveSequences(locations, routeId);
+            List<GeofenceLocation> filteredLocations = filterConsecutiveSequences(geofenceLocationList, routeId);
 
             consequenceMap.put(routeId, filteredLocations);
         }
@@ -298,12 +315,15 @@ public class AverageTimeAlgorithmService {
     }
 
 
-    private List<GeofenceLocation> filterConsecutiveSequences(List<GeofenceLocation> locations, String routeId) {
+    private List<GeofenceLocation> filterConsecutiveSequences(List<GeofenceLocation> geofenceLocationList, String routeId) {
         List<GeofenceLocation> result = new ArrayList<>();
         List<GeofenceLocation> temp = new ArrayList<>();
 
         // busInfoMap처럼 String 형태로 sequence 값 추출
-        List<Long> sequences = extractSequencesFromBusInfo(locations, routeId);
+        List<Long> sequencesTemp = extractSequencesFromBusInfo(geofenceLocationList, routeId);
+        System.out.println("sequencesTemp = " + sequencesTemp);
+        List<Long> sequences = optimizeSequence(sequencesTemp);
+        System.out.println("sequences = " + sequences);
 
         // sequence가 하나만 있거나 아예 없을 때를 대비한 예외 처리
         if (sequences.isEmpty()) {
@@ -314,17 +334,17 @@ public class AverageTimeAlgorithmService {
         for (int i = 0; i < sequences.size(); i++) {
             // 처음에는 temp에 첫 번째 시퀀스를 넣는다
             if (temp.isEmpty()) {
-                temp.add(locations.get(i));
+                temp.add(geofenceLocationList.get(i));
             } else {
                 // 현재 sequence가 이전 sequence와 1씩 증가하는지 확인
                 if (sequences.get(i) == sequences.get(i - 1) + 1) {
-                    temp.add(locations.get(i)); // 연속된 sequence일 경우 temp에 추가
+                    temp.add(geofenceLocationList.get(i)); // 연속된 sequence일 경우 temp에 추가
                 } else {
                     if (temp.size() > 1) { // 2개 이상이면 연속된 시퀀스로 저장
                         result.addAll(temp);
                     }
                     temp.clear(); // 새로운 구간 시작
-                    temp.add(locations.get(i)); // 새로운 구간의 첫 번째 시퀀스를 추가
+                    temp.add(geofenceLocationList.get(i)); // 새로운 구간의 첫 번째 시퀀스를 추가
                 }
             }
         }
@@ -338,28 +358,40 @@ public class AverageTimeAlgorithmService {
     }
 
 
-    private List<Long> extractSequencesFromBusInfo(List<GeofenceLocation> locations, String routeId) {
+    private List<Long> extractSequencesFromBusInfo(List<GeofenceLocation> geofenceLocationList, String routeId) {
         List<Long> sequences = new ArrayList<>();
 
-        for (GeofenceLocation location : locations) {
-            String busInfo = location.stationBusInfo(); // busInfo 가져오기
+        for (GeofenceLocation geofenceLocation : geofenceLocationList) {
+            String busInfo = geofenceLocation.stationBusInfo(); // busInfo 가져오기
 
+            List<Long> temp = new ArrayList<>();
             // busInfo에서 해당 routeId에 맞는 sequence 찾기
-            for (String entry : busInfo.split("},\\{")) {
-                entry = entry.replaceAll("[{}]", "");  // `{100100014,1}` -> `100100014,1`
-                String[] parts = entry.split(",");    // `100100014,1` -> `["100100014", "1"]`
+            for (String oneBunInfo : busInfo.split("},\\{")) {
+
+                oneBunInfo = oneBunInfo.replaceAll("[{}]", "");  // `{100100014,1}` -> `100100014,1`
+                String[] parts = oneBunInfo.split(",");    // `100100014,1` -> `["100100014", "1"]`
                 if (parts.length == 2 && parts[0].equals(routeId)) {
-                    sequences.add(Long.parseLong(parts[1])); // sequence 값 저장
-                    break;
+                    temp.add(Long.parseLong(parts[1]));
                 }
+
             }
+            if (temp.size() == 2) {
+                long orNumber = Long.parseLong(temp.get(0) + "000" + temp.get(1));
+                sequences.add(orNumber);
+            }
+
+            if (temp.size() == 1) {
+                sequences.add(temp.get(0));
+            }
+
+            if (temp.size() != 1 && temp.size() != 2) {
+                throw new RuntimeException("extractSequencesFromBusInfo 메서드에서 에러 발생");
+            }
+
         }
 
         return sequences;
     }
-
-
-
 
     private Map<String, List<Map<String, LocalDateTime>>> transformGeofenceLocationToTime(Map<String, List<GeofenceLocation>> continuousGeofenceLocationMap) {
         TreeMap<String, List<Map<String, LocalDateTime>>> timeMap = new TreeMap<>();
@@ -382,6 +414,7 @@ public class AverageTimeAlgorithmService {
 
         return timeMap;
     }
+
     private List<String> makeBusInfoList(List<GeofenceLocation> sortedGeofenceLocations) {
         // busInfo만 존재하는 List 생성
         List<String> busInfoList = new ArrayList<>();
@@ -394,6 +427,7 @@ public class AverageTimeAlgorithmService {
 
         return busInfoList;
     }
+
     private Set<String> makeRouteIdSet(List<String> busInfoList) {
         // busInfoList에서 각 busInfo의 routeId만 추출하여 set에 추가
         Set<String> localSet = new HashSet<>();
@@ -431,9 +465,80 @@ public class AverageTimeAlgorithmService {
 
         } // end for
     }
+
     private List<GeofenceLocation> sortByUserFenceInTime(List<GeofenceLocation> geofenceLocationList) {
         return geofenceLocationList.stream()
                 .sorted(Comparator.comparing(GeofenceLocation::userFenceInTime))
                 .toList();
     }
+
+    private String toOriginRouteId(String routeId) {
+        return Arrays.asList(routeId.split("_")).get(0);
+    }
+
+
+    // gpt 코드 (리펙토링 필요)
+    public static List<Long> optimizeSequence(List<Long> sequences) {
+        List<List<Long>> possibleCombinations = new ArrayList<>();
+
+        // 각 숫자를 앞 2자리 & 뒷 2자리로 변환
+        for (Long num : sequences) {
+            possibleCombinations.add(getPossibleValues(num));
+        }
+
+        // 최적의 연속된 숫자 조합 선택
+        return findBestSequence(possibleCombinations);
+    }
+
+    private static List<Long> getPossibleValues(Long num) {
+        String strNum = String.valueOf(num);
+        List<Long> values = new ArrayList<>();
+
+        // 숫자 자릿수 확인
+        int length = strNum.length();
+
+        if (length >= 7) {
+            // 길이가 7자리 이상일 경우: 앞 2자리 + 뒤 3자리
+            values.add(Long.parseLong(strNum.substring(0, 2))); // 앞 2자리
+            values.add(Long.parseLong(strNum.substring(length - 3))); // 뒤 3자리
+        } else if (length >= 5) {
+            // 길이가 5자리 이상 7자리 미만일 경우: 앞 2자리 + 뒤 2자리
+            values.add(Long.parseLong(strNum.substring(0, 2))); // 앞 2자리
+            values.add(Long.parseLong(strNum.substring(length - 2))); // 뒤 2자리
+        } else {
+            // 길이가 5자리 미만일 경우: 그대로 추가
+            values.add(num);
+        }
+
+        return values;
+    }
+
+    private static List<Long> findBestSequence(List<List<Long>> optionsList) {
+        List<Long> bestSequence = new ArrayList<>();
+        Long prev = null;
+
+        for (List<Long> options : optionsList) {
+            if (options.size() == 1) {  // 리스트 크기가 1이면 그대로 추가
+                bestSequence.add(options.get(0));
+            } else {
+                if (prev == null) {
+                    bestSequence.add(options.get(1)); // 첫 번째 숫자는 뒷 2자리 선택
+                } else {
+                    // 이전 숫자와 가장 연속된 숫자 찾기
+                    Long bestOption = options.get(1); // 기본적으로 뒷 2자리 선택
+                    for (Long option : options) {
+                        if (prev + 1 == option) { // 연속된 숫자가 있으면 선택
+                            bestOption = option;
+                            break;
+                        }
+                    }
+                    bestSequence.add(bestOption);
+                }
+            }
+            prev = bestSequence.get(bestSequence.size() - 1);
+        }
+
+        return bestSequence;
+    }
+
 }
