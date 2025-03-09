@@ -1,6 +1,7 @@
 package project.paypass.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.antlr.v4.runtime.tree.Tree;
 import org.springframework.stereotype.Service;
 import project.paypass.domain.GeofenceLocation;
 
@@ -29,10 +30,14 @@ public class BasicAlgorithmService {
         Map<String, List<Long>> busInfoMap = makeBusInfoMap(busInfoList);
         log.info("busInfoMap = " + busInfoMap);
 
+        // 모든 경우에 수 중에서 가장 연속된 구간이 긴 busInfoMap만 살리기
+        Map<String, List<Long>> maxContinuousMap = filterMaxContinuousMap(busInfoMap, busInfoList);
+        log.info("maxContinuousMap = " + maxContinuousMap);
+
         // sequence가 순차적으로 증가하는지 검사
         // sequence의 일정 부분만 조건 만족 시 해당 부분의 sequence만 추출
         // 조건 만족 시 해당 sequence를 가지는 map 추가
-        Map<String, List<Long>> continuousBusInfoMap = makeContinuousBusInfoMap(busInfoMap);
+        Map<String, List<Long>> continuousBusInfoMap = makeContinuousBusInfoMap(maxContinuousMap);
         log.info("continuousBusInfoMap = " + continuousBusInfoMap);
 
         return continuousBusInfoMap;
@@ -66,9 +71,55 @@ public class BasicAlgorithmService {
 
         // 중복되는 routeId를 해결하기 위해
         // sequence 값에 000이 있으면 경우의 수를 두개로 분리
-        Map<String, List<Long>> finalBusInfoMap = divideBusInfoMap(busInfoMap);
+        Map<String, List<Long>> divideBusInfoMap = divideBusInfoMap(busInfoMap);
 
-        return finalBusInfoMap;
+        // 분리되지 않은 key 값들에게 _1 부여
+        Map<String, List<Long>> finalMap = plueOneToOriginBusInfoMap(divideBusInfoMap);
+
+        return finalMap;
+    }
+
+    private Map<String, List<Long>> filterMaxContinuousMap(Map<String, List<Long>> busInfoMap, List<String> busInfoList) {
+
+        // 연속된 숫자의 개수를 나타내는 continuousCountMap 작성
+        Map<String, Long> continuousCountMap = makeContinuousCountMap(busInfoMap);
+        log.info("continuousCountMap = " + continuousCountMap);
+
+        // 최대값을 나타내는 maxMap 작성
+        Map<String, Long> maxMap = makeMaxMap(continuousCountMap, busInfoList);
+        log.info("maxMap = " + maxMap);
+
+        // 해당 maxMap을 만족하는 routeId를 가진 maxContinuousList 작성
+        List<String> maxContinuousList = makeMaxContinuousList(continuousCountMap, maxMap);
+        log.info("maxContinuousList = " + maxContinuousList);
+
+        // 최대값을 가지는 List를 출력하는 maxContinuousMap 작성
+        // Map에서 가장 적게 분할되는 routeId 별 List만 남기기
+        Map<String, List<Long>> maxContinuousMap = makeMaxContinuousMap(busInfoMap, maxMap, maxContinuousList);
+
+        return maxContinuousMap;
+    }
+
+    private Map<String, List<Long>> makeContinuousBusInfoMap(Map<String, List<Long>> busInfoMap) {
+        Map<String, List<Long>> continuousBusInfoMap = new TreeMap<>();
+
+        for (String routeId : busInfoMap.keySet()) {
+            List<Long> sequenceList = busInfoMap.get(routeId);
+            List<List<Long>> continuousSequenceList = checkSequential(sequenceList);
+
+            for (List<Long> continuousSequences : continuousSequenceList) {
+                // 여기서 Map으로 저장
+                // Map Ket Name _? 으로 생성해야한다
+
+                // route가 이미 존재하면 다음 _? 값을 배정해야한다
+                // _가 이미 붙어있는 상황을 생각해야한다.
+                String keyName = assignKeyName(continuousBusInfoMap, routeId);
+
+                continuousBusInfoMap.put(keyName, continuousSequences);
+            }
+        }
+
+        return continuousBusInfoMap;
     }
 
     private Set<String> makeRouteIdSet(List<String> busInfoList) {
@@ -115,32 +166,6 @@ public class BasicAlgorithmService {
                 sequenceList.add(sequence);
             }
         }
-    }
-
-    private List<String> checkDuplicateRouteId(List<String> oneStationInfoList) {
-        Map<String, StringBuilder> oneStationInfoMap = new TreeMap<>();
-
-        for (String oneBusInfo : oneStationInfoList) {
-            List<String> routeIdAndSequence = Arrays.asList(oneBusInfo.split(","));
-            String routeId = routeIdAndSequence.get(0);
-            String sequence = routeIdAndSequence.get(1);
-
-            // 같은 routeId가 있으면 "000"을 추가하여 결합
-            oneStationInfoMap.putIfAbsent(routeId, new StringBuilder());
-            if (!oneStationInfoMap.get(routeId).isEmpty()) {
-                oneStationInfoMap.get(routeId).append("000");
-            }
-            oneStationInfoMap.get(routeId).append(sequence);
-        }
-
-        List<String> checkedOneStationInfoList = new ArrayList<>();
-        for (var oneBusInfo : oneStationInfoMap.entrySet()) {
-            String routeId = oneBusInfo.getKey();
-            String sequence = oneBusInfo.getValue().toString();
-            checkedOneStationInfoList.add(routeId + "," + sequence);
-        }
-
-        return checkedOneStationInfoList;
     }
 
     private Map<String, List<Long>> divideBusInfoMap(Map<String, List<Long>> busInfoMap) {
@@ -191,6 +216,7 @@ public class BasicAlgorithmService {
                         break;
                     }
                 }
+
             }
         } // for문 종료
 
@@ -208,6 +234,215 @@ public class BasicAlgorithmService {
         }
 
         return busInfoMap;
+    }
+
+    private Map<String, List<Long>> plueOneToOriginBusInfoMap(Map<String, List<Long>> divideBusInfoMap) {
+        Map<String, List<Long>> finalMap = new TreeMap<>();
+
+        for (var routeIdAndSequenceList : divideBusInfoMap.entrySet()) {
+            String routeId = routeIdAndSequenceList.getKey();
+            List<Long> sequenceList = routeIdAndSequenceList.getValue();
+
+            if (!routeId.contains("_")){
+                routeId += "_1";
+            }
+
+            finalMap.put(routeId, sequenceList);
+        }
+
+        return finalMap;
+    }
+
+    private Map<String, Long> makeContinuousCountMap(Map<String, List<Long>> busInfoMap){
+        Map<String, Long> continuousCountMap = new TreeMap<>();
+
+        for (var routeIdAndSequenceList : busInfoMap.entrySet()) {
+            String routeId = routeIdAndSequenceList.getKey();
+            List<Long> sequenceList = routeIdAndSequenceList.getValue();
+
+            Long continuousCount = calculateContinuousCount(sequenceList);
+            continuousCountMap.put(routeId, continuousCount);
+        }
+
+        return continuousCountMap;
+    }
+
+    private Map<String, Long> makeMaxMap(Map<String, Long> continuousCountMap, List<String> busInfoList) {
+        Map<String, Long> maxMap = new TreeMap<>();
+
+        List<String> routeIdList = makeRouteIdSet(busInfoList).stream().sorted().toList();
+
+        for (String originalRouteId : routeIdList) {
+            Long maxCount = 0L;
+            for (var routeIdAndContinuousCount : continuousCountMap.entrySet()) {
+                String routeId = routeIdAndContinuousCount.getKey();
+                Long continuousCount = routeIdAndContinuousCount.getValue();
+
+                String routeIdForCheck = Arrays.asList(routeId.split("_")).get(0);
+                // originalRouteId와 비교하여 maxCount 갱신
+                if (originalRouteId.equals(routeIdForCheck) && continuousCount > maxCount) {
+                    maxCount = continuousCount;
+                }
+            } // for문 종료
+
+            // maxMap에서 0 값인 routeId 삭제
+            // -> 인자가 하나거나 연속되는 부분이 존재하지 않는 routeId 제거
+            if (maxCount != 0) {
+                maxMap.put(originalRouteId, maxCount);
+            }
+
+        } // for문 종료
+        return maxMap;
+    }
+
+    private List<String> makeMaxContinuousList(Map<String, Long> continuousCountMap, Map<String, Long> maxMap) {
+        List<String> maxContinuousList = new ArrayList<>();
+
+        for (var originalRouteIdAndMaxCount : maxMap.entrySet()) {
+            String originalRouteId = originalRouteIdAndMaxCount.getKey();
+            Long maxCount = originalRouteIdAndMaxCount.getValue();
+
+            for (var routeIdAndContinuousCount : continuousCountMap.entrySet()) {
+                String routeId = routeIdAndContinuousCount.getKey();
+                Long continuousCount = routeIdAndContinuousCount.getValue();
+
+                String routeIdForCheck = Arrays.asList(routeId.split("_")).get(0);
+                if (originalRouteId.equals(routeIdForCheck) && maxCount == continuousCount){
+                    maxContinuousList.add(routeId);
+                }
+            } // for문 종료
+        }  // for문 종료
+
+        return maxContinuousList;
+    }
+
+    private Map<String, List<Long>> makeMaxContinuousMap(Map<String, List<Long>> busInfoMap, Map<String, Long> maxMap, List<String> maxContinuousList) {
+        Map<String, List<Long>> maxContinuousMap = new TreeMap<>();
+        List<String> originRouteIdList = maxMap.keySet().stream().sorted().toList();
+
+        for (String originRouteId : originRouteIdList) {
+            String minRouteId = "null";
+            List<Long> minSequenceList = new ArrayList<>();
+            int minSize = 999;
+
+            for (String routeId : maxContinuousList) {
+
+                // 포함하지 않는다면 다음 originRoueId로 넘어가기
+                if (routeId.contains(originRouteId)) {
+                    // 분리하였을때 분리되는 개수 구하기
+                    List<Long> sequenceList = busInfoMap.get(routeId);
+
+                    List<List<Long>> dividedContinuousList = checkSequential(sequenceList);
+
+                    // 가장 적은 개수의 routeId만 사용하여 maxContinuousMap에 삽입
+                    if (dividedContinuousList.size() < minSize) {
+                        minRouteId = routeId;
+                        minSequenceList = sequenceList;
+                        minSize = dividedContinuousList.size();
+                    }
+                } // if 문 종료
+            } // for문 종료
+
+            if (minRouteId.equals("null") || minSize == 999 || minSequenceList.isEmpty()) {
+                throw new RuntimeException("makeMaxContinuousMap에서 에러 발생");
+            }
+
+            maxContinuousMap.put(minRouteId, minSequenceList);
+
+        } // for문 종료
+
+        return maxContinuousMap;
+    }
+
+    private Long calculateContinuousCount(List<Long> sequenceList) {
+        // ex) sequenceList = [19] -> 0
+        // ex) sequenceList = [22,25] -> 0
+        // ex) sequenceList = [1,2,3,4,4,6,9] -> 4
+        // ex) sequenceList = [1,3,4,5,9,13,21,22] -> 5
+        // ex) sequenceList = [1,3,2,4,7,1,0,1,2,3,3,2,6] -> 4
+        // ex) sequenceList = [1,2,3,7,8,23,24,1,3] -> 7
+        // 연속되는 부분이 있다면 해당 sequence 값을 continuousSequenceList 리스트에 넣기
+
+        Long totalCount = 0L;
+        Long currentCount = 1L;
+        for (int i = 1; i < sequenceList.size(); i++) {
+            Long currentSequence = sequenceList.get(i);
+            Long previousSequence = sequenceList.get(i - 1);
+
+            // 연속된 숫자라면
+            if (currentSequence.equals(previousSequence + 1)) {
+                currentCount++;
+                continue;
+            }
+
+            // 연속이 끊어졌다면 그 길이를 합산하고 currentCount 초기화
+            if (currentCount > 1) {
+                totalCount += currentCount;
+            }
+            currentCount = 1L;  // 새로운 구간 시작
+        }
+
+        // 마지막 구간도 확인
+        if (currentCount > 1) {
+            totalCount += currentCount;
+        }
+
+        return totalCount;
+    }
+
+    private List<List<Long>> checkSequential(List<Long> sequenceList) {
+        List<List<Long>> continuousSequenceList = new ArrayList<>();
+
+        // ex) sequenceList = [1,2,3,4,4,6,9] -> continuousSequenceList = [[1,2,3,4]]
+        // ex) sequenceList = [1,3,4,5,9,13,21,22] -> continuousSequenceList = [[3,4,5], [21,22]]
+        // ex) sequenceList = [1,3,2,4,7,1,0,1,2,3,3,2,6] -> continuousSequenceList = [[0,1,2,3]]
+        // ex) sequenceList = [1,2,3,7,8,23,24,1,3] -> continuousSequenceList = [[1,2,3], [7,8], [23, 24]]
+        // 연속되는 부분이 있다면 해당 sequence 값을 continuousSequenceList 리스트에 넣기
+
+        List<Long> continuousSequences = new ArrayList<>(List.of(sequenceList.get(0)));
+
+        for (int i = 1; i < sequenceList.size(); i++) {
+            Long currentSequence = sequenceList.get(i);
+            Long previousSequence = sequenceList.get(i - 1);
+
+            if (currentSequence.equals(previousSequence + 1)) {
+                continuousSequences.add(currentSequence);
+                continue;
+            }
+
+            addContinuousSequencesIfValid(continuousSequenceList, continuousSequences);
+            continuousSequences = new ArrayList<>(List.of(currentSequence));
+        }
+
+        addContinuousSequencesIfValid(continuousSequenceList, continuousSequences);
+
+        return continuousSequenceList;
+    }
+
+    private List<String> checkDuplicateRouteId(List<String> oneStationInfoList) {
+        Map<String, StringBuilder> oneStationInfoMap = new TreeMap<>();
+
+        for (String oneBusInfo : oneStationInfoList) {
+            List<String> routeIdAndSequence = Arrays.asList(oneBusInfo.split(","));
+            String routeId = routeIdAndSequence.get(0);
+            String sequence = routeIdAndSequence.get(1);
+
+            // 같은 routeId가 있으면 "000"을 추가하여 결합
+            oneStationInfoMap.putIfAbsent(routeId, new StringBuilder());
+            if (!oneStationInfoMap.get(routeId).isEmpty()) {
+                oneStationInfoMap.get(routeId).append("000");
+            }
+            oneStationInfoMap.get(routeId).append(sequence);
+        }
+
+        List<String> checkedOneStationInfoList = new ArrayList<>();
+        for (var oneBusInfo : oneStationInfoMap.entrySet()) {
+            String routeId = oneBusInfo.getKey();
+            String sequence = oneBusInfo.getValue().toString();
+            checkedOneStationInfoList.add(routeId + "," + sequence);
+        }
+
+        return checkedOneStationInfoList;
     }
 
     private boolean check000(Map<String, List<Long>> busInfoMap) {
@@ -232,69 +467,6 @@ public class BasicAlgorithmService {
             }
         }
         return countList.stream().max(Long::compareTo).get();
-    }
-
-    private Map<String, List<Long>> makeContinuousBusInfoMap(Map<String, List<Long>> busInfoMap) {
-        Map<String, List<Long>> continuousBusInfoMap = new TreeMap<>();
-
-        for (String routeId : busInfoMap.keySet()) {
-            List<Long> sequenceList = busInfoMap.get(routeId);
-            List<List<Long>> continuousSequenceList = checkSequential(sequenceList);
-
-            // checkSequential 불만족 시 바로 다음 routeId로 넘어가기
-            if (continuousSequenceList.isEmpty()) {
-                continue;
-            }
-
-            for (List<Long> continuousSequences : continuousSequenceList) {
-                // 여기서 Map으로 저장
-                // Map Ket Name _? 으로 생성해야한다
-
-                // route가 이미 존재하면 다음 _? 값을 배정해야한다
-                // _가 이미 붙어있는 상황을 생각해야한다.
-                String keyName = assignKeyName(continuousBusInfoMap, routeId);
-
-                continuousBusInfoMap.put(keyName, continuousSequences);
-            }
-        }
-
-        return continuousBusInfoMap;
-    }
-
-    private List<List<Long>> checkSequential(List<Long> sequenceList) {
-        List<List<Long>> continuousSequenceList = new ArrayList<>();
-
-        // ex) sequenceList = [19] -> continuousSequenceList = [[]]
-        // ex) sequenceList = [22,25] -> continuousSequenceList = [[]]
-        // ex) sequenceList = [1,2,3,4,4,6,9] -> continuousSequenceList = [[1,2,3,4]]
-        // ex) sequenceList = [1,3,4,5,9,13,21,22] -> continuousSequenceList = [[3,4,5], [21,22]]
-        // ex) sequenceList = [1,3,2,4,7,1,0,1,2,3,3,2,6] -> continuousSequenceList = [[0,1,2,3]]
-        // ex) sequenceList = [1,2,3,7,8,23,24,1,3] -> continuousSequenceList = [[1,2,3], [7,8], [23, 24]]
-        // 연속되는 부분이 있다면 해당 sequence 값을 continuousSequenceList 리스트에 넣기
-
-        // sequenceList의 인자가 하나인 경우
-        if (sequenceList.size() < 2) {
-            return continuousSequenceList;
-        }
-
-        List<Long> continuousSequences = new ArrayList<>(List.of(sequenceList.get(0)));
-
-        for (int i = 1; i < sequenceList.size(); i++) {
-            Long currentSequence = sequenceList.get(i);
-            Long previousSequence = sequenceList.get(i - 1);
-
-            if (currentSequence.equals(previousSequence + 1)) {
-                continuousSequences.add(currentSequence);
-                continue;
-            }
-
-            addContinuousSequencesIfValid(continuousSequenceList, continuousSequences);
-            continuousSequences = new ArrayList<>(List.of(currentSequence));
-        }
-
-        addContinuousSequencesIfValid(continuousSequenceList, continuousSequences);
-
-        return continuousSequenceList;
     }
 
     private void addContinuousSequencesIfValid(List<List<Long>> continuousSequenceList, List<Long> continuousSequences) {
