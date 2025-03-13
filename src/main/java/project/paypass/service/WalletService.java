@@ -17,14 +17,4 @@ public class WalletService {
     public void save(Wallet wallet){
         walletRepository.save(wallet);
     }
-
-    @Transactional
-    public Wallet findById(Long id){
-        return walletRepository.findById(id).get();
-    }
-
-    @Transactional
-    public Long findIdByMainId(String mainId){
-        return walletRepository.findByMainId(mainId).get(0).getId();
-    }
 }
