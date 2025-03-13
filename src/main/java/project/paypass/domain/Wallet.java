@@ -6,10 +6,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @NoArgsConstructor
 @Entity
 @Getter
+@Setter
 public class Wallet {
 
     @Id @GeneratedValue
@@ -34,7 +36,6 @@ public class Wallet {
         this.payCheck = true;
     }
 
-    // 새로운 생성자 추가: account만 변경할 수 있도록
     public Wallet(Long id, String mainId, Long account, Long charge, boolean payCheck) {
         this.id = id;
         this.mainId = mainId;
