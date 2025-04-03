@@ -35,7 +35,4 @@ public class UserController {
         String stringBirth = birth.toString();
         return stringBirth.substring(0,stringBirth.indexOf("T"));
     }
-
-
-
 }
