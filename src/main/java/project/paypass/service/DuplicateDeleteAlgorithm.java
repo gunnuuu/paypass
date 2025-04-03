@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 public class DuplicateDeleteAlgorithm {
 
     // 평균 시간 데이터를 통과하고 난 이후의 geofenceLocation 데이터만 들어온다.
-    public Map<List<GeofenceLocation>, List<String>> algorithmStart(List<GeofenceLocation> geofenceLocations, Map<String, List<Long>> averageTimeMap) {
+    public Map<List<GeofenceLocation>, List<String>> algorithmStart(Map<String, List<Long>> averageTimeMap, List<GeofenceLocation> geofenceLocations) {
 
         // 데이터 정렬(fenceInTime 기준)
         List<GeofenceLocation> sortedGeofenceLocations = sortByUserFenceInTime(geofenceLocations);
