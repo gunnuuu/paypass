@@ -1,15 +1,15 @@
 package project.paypass.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
 @Entity
-@Data
+@NoArgsConstructor
+@Getter
 public class BusTime {
-
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
@@ -20,7 +20,4 @@ public class BusTime {
 
     @Column(nullable = false)
     private String arrivalTime;
-
-    @Column(nullable = false)
-    private String stationNumber;
 }
