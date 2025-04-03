@@ -43,6 +43,7 @@ public class WalletHttpService {
         }
     }
 
+    @Transactional
     public Long getAccount(String mainId) {
         return walletRepository.findByMainId(mainId)
                 .stream()
