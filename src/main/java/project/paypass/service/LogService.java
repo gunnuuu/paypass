@@ -84,17 +84,16 @@ public class LogService {
                             log.getArrivalTime(),
                             log.getDepartureStationNumber(),
                             log.getArrivalStationNumber(),
-                            log.getRouteIdList(),
                             log.getPayCheck()
                     );
                 })
                 .collect(Collectors.toList());
     }
 
-    public List<DetailLogDto> findByMain_IdandLog_Id(String mainId, Long logId) {
-        List<DetailLog> detaillogs = detailLogRepository.findByLog_Main_IdAndLog_Id(mainId, logId);
+    public List<DetailLogDto> findByMainIdAndLogId(String mainId, Long logId) {
+        List<DetailLog> detailLogs = detailLogRepository.findByMainIdAndLogId(mainId, logId);
 
-        return detaillogs.stream()
+        return detailLogs.stream()
                 .map(detaillog -> {
                     System.out.println("로그 ID: " + detaillog.getId()); // 각 로그의 ID를 출력해서 확인
                     return new DetailLogDto(
