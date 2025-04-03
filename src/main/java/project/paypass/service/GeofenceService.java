@@ -46,16 +46,27 @@ public class GeofenceService {
 
     @Transactional
     public Map<List<GeofenceLocation>, List<String>> startAlgorithm(String mainId){
-
         // mainId로 geofenceLocation 조회
         List<GeofenceLocation> geofenceLocations = geofenceLocationRepository.findByMainId(mainId);
 
+        Map<List<GeofenceLocation>, List<String>> resultMap = mainAlgorithm(geofenceLocations);
+
+        return resultMap;
+    }
+
+    @Transactional
+    public Map<List<GeofenceLocation>, List<String>> mainAlgorithm(List<GeofenceLocation> geofenceLocations){
         // 알고리즘 실행
         Map<String, List<Long>> basicMap = basicAlgorithmService.algorithmStart(geofenceLocations);
         Map<String, List<Long>> averageTimeMap = averageTimeAlgorithmService.algorithmStart(basicMap, geofenceLocations);
-        Map<List<GeofenceLocation>, List<String>> resultMap = duplicateDeleteAlgorithm.algorithmStart(geofenceLocations, averageTimeMap);
+        Map<List<GeofenceLocation>, List<String>> resultMap = duplicateDeleteAlgorithm.algorithmStart(averageTimeMap, geofenceLocations);
 
         return resultMap;
+    }
+
+    @Transactional
+    public List<GeofenceLocation> findByMainId(String mainId){
+        return geofenceLocationRepository.findByMainId(mainId);
     }
 
 }
